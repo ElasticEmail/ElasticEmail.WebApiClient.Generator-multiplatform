@@ -57,10 +57,9 @@
   <ItemGroup>
     <Compile Include="ApiCategoryAttribute.cs" />
     <Compile Include="ApiHiddenAttribute.cs" />
+    <Compile Include="ApiLicenseSupplier.cs" />
     <Compile Include="ApiVisibleAttribute.cs" />
     <Compile Include="ClientType.cs" />
-    <Compile Include="generators\HtmlGenerator.cs" />
-    <Compile Include="generators\JsonGenerator.cs" />
     <Compile Include="parser\Category.cs" />
     <Compile Include="parser\Class.cs" />
     <Compile Include="parser\DataType.cs" />

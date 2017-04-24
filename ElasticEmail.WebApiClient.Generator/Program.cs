@@ -89,7 +89,6 @@ namespace ElasticEmail
             string projectFilename = "apigenerator.json";
             string filePath = Environment.CurrentDirectory + "\\" + projectFilename;
 
-            //if (!File.Exists(filePath) || IsNewVersionAvailable(url, filePath))
             DownloadNewestProject(url, projectFilename);
 
             byte[] projectData = ReadFile(filePath);
@@ -138,32 +137,6 @@ namespace ElasticEmail
                 && (uriResult.Scheme == Uri.UriSchemeHttp || uriResult.Scheme == Uri.UriSchemeHttps);
         }
 
-        public static bool IsNewVersionAvailable(string url, string filePath)
-        {
-            byte[] data;
-            using (WebClient web = new WebClient())
-                data = web.DownloadData(url + "/public/apigenerator?checkversion=true");
-            byte[] projectData = ReadFile(filePath);
-
-            JsonSerializerSettings settings = new JsonSerializerSettings
-            {
-                TypeNameHandling = TypeNameHandling.Auto
-            };
-
-            APIDocParser.Project projectLocal = JsonConvert.DeserializeObject<APIDocParser.Project>(Encoding.UTF8.GetString(projectData).Replace("ElasticEmailAPI", "EEClientGenerator"), settings);
-            double localVersion = float.Parse(projectLocal.Version ?? "0.0", CultureInfo.InvariantCulture);
-            double webVersion = 0.0;
-            try
-            {
-                webVersion = float.Parse(Encoding.UTF8.GetString(data), CultureInfo.InvariantCulture);
-            }
-            catch
-            {
-                var projectWeb = JsonConvert.DeserializeObject<APIDocParser.Project>(Encoding.UTF8.GetString(data).Replace("ElasticEmailAPI", "EEClientGenerator"), settings);
-                webVersion = float.Parse(projectWeb.Version, CultureInfo.InvariantCulture);
-            }
-            return webVersion > localVersion;
-        }
 
         public static void DownloadNewestProject(string url, string filename)
         {

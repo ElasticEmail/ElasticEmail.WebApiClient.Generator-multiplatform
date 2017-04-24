@@ -1,9 +1,9 @@
-﻿using System;
+﻿using ElasticEmail.WebApiClient.Generator;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Web;
-using static EEClientGenerator.generators.APIDoc;
 
 namespace ElasticEmail.generators
 {
@@ -158,7 +158,7 @@ class ApiClient:
                 var py = new StringBuilder();
 
                 py.AppendLine("'''");
-                py.AppendLine(HtmlGenerator.ApiLicense);
+                py.AppendLine(ApiLicenseSupplier.ApiLicense);
                 py.AppendLine("'''");
                 py.AppendLine();
 

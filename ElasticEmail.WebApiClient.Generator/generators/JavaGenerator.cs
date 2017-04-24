@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Web;
 using ICSharpCode.SharpZipLib.Zip;
-using static EEClientGenerator.generators.APIDoc;
+using ElasticEmail.WebApiClient.Generator;
 
 namespace ElasticEmail.generators
 {
@@ -411,7 +411,7 @@ public class FileData {
                 PutFileIn("ElasticEmailClient\\com\\elasticemail\\app\\API.java", APIJava.ToString(), zipStream);
                 PutFileIn("ElasticEmailClient\\com\\elasticemail\\app\\APIResponse.java", APIResponseJava.ToString(), zipStream);
                 PutFileIn("ElasticEmailClient\\com\\elasticemail\\app\\FileData.java", FileDataJava.ToString(), zipStream);
-                PutFileIn("ElasticEmailClient\\com\\elasticemail\\app\\License.txt", HtmlGenerator.ApiLicense, zipStream);
+                PutFileIn("ElasticEmailClient\\com\\elasticemail\\app\\License.txt", ApiLicenseSupplier.ApiLicense, zipStream);
 
                 foreach (var cat in project.Categories.OrderBy(f => f.Value.Name))
                 {

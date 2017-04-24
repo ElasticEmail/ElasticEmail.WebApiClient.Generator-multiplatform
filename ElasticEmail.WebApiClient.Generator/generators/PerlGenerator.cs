@@ -1,9 +1,9 @@
-﻿using System;
+﻿using ElasticEmail.WebApiClient.Generator;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Web;
-using static EEClientGenerator.generators.APIDoc;
 
 namespace ElasticEmail.generators
 {
@@ -123,7 +123,7 @@ namespace ElasticEmail.generators
 
 +
 
-"#" + HtmlGenerator.ApiLicense.Replace("\n", "\n#")
+"#" + ApiLicenseSupplier.ApiLicense.Replace("\n", "\n#")
 
 +
 
