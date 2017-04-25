@@ -79,15 +79,20 @@ namespace ElasticEmail.generators
                 var js = new StringBuilder();
 
                 js.Append(
-                    @"function EEAPI(options) {
-
-    /* region Initialization */
-    if (!window.jQuery) {
-        return false;
+                    @"(function ( root, factory ) {
+    if ( typeof define === ""function"" && define.amd ) {
+        define([""jquery""], factory);
+            } else if ( typeof exports === ""object"" ) {
+        module.exports = factory( false, require( 'request' ), require( 'querystring' ) );
+    } else {
+        root.EEAPI = factory(root.$ );
     }
-    var $ = window.jQuery;
-    var that = {Account: {}, Attachment: {}, Campaign: {}, Contact: {}, Domain: {}, List: {}, Segments: {}, SMS: {}, Status: {}, Template: {}};
-    var cfg = $.extend({
+}(this, function ( $, req, querystring ) {
+    return function EEAPI(options) {
+
+    
+    var that = {};
+    var cfg = {
         ApiUri: ""https://api.elasticemail.com/"",
         ApiKey: """",
         Version: 2,
@@ -102,13 +107,13 @@ namespace ElasticEmail.generators
         },
         always: function () {
         }
-    }, options);
+    };
     /* endregion Initialization */
 
     /* region Utilities */
-
+   
     //Main request method
-    var request = function request(target, query, callback, method) {
+    var ajaxRequest = function request(target, query, callback, method) {
         if (method !== ""POST"") {
             method = ""GET"";
         }
@@ -128,9 +133,37 @@ namespace ElasticEmail.generators
             callback(response.data || false);
         }).fail(cfg.fail).always(cfg.always);
     };
+var request;
+var reqRequest = function request (target, query, callback, method) {
 
-    //Method to upload file with get params
-    var uploadPostFile = function uploadPostFile(target, fileObj, query, callback) {
+        if (method !== ""POST"") {
+            method = ""GET"";
+            }
+            query.apikey = cfg.ApiKey;
+        req({
+                uri: cfg.ApiUri + 'v' + cfg.Version + target + ""?"" + querystring.stringify(query),
+          method: method,
+          //'content-type': 'application/json',
+          data: JSON.stringify(query)
+        }, function(error, response, body)
+            {
+                if (error) return callback(error);
+                var res = JSON.parse(body);
+                if (!res.success) return callback(res.error);
+                callback(res.data);
+            })
+        };
+
+      if ($ === false && req && querystring) {
+        Object.assign(cfg, options);
+        request = reqRequest;
+      } else {
+        cfg = $.extend(cfg, options);
+    request = ajaxRequest;
+      }
+
+//Method to upload file with get params
+var uploadPostFile = function uploadPostFile(target, fileObj, query, callback) {
         var fd = new FormData();
         var xhr = new XMLHttpRequest();
         query.apikey = cfg.ApiKey;
@@ -213,7 +246,7 @@ namespace ElasticEmail.generators
 
                 js.AppendLine("    /*-- PUBLIC METHODS --*/");
                 js.AppendLine("    that.setApiKey = setApiKey;");
-                js.AppendLine(string.Join("\r\n", project.Categories.OrderBy(f => f.Value.Name).Select(f => string.Format("    that.{0} = {0};", f.Value.Name.ToLower()))));
+                js.AppendLine(string.Join("\r\n", project.Categories.OrderBy(f => f.Value.Name).Select(f => string.Format("    that.{0} = {1};", f.Value.NameLocal, f.Value.Name.ToLower()))));
                 js.AppendLine("    return that;");
                 js.AppendLine();
 
@@ -245,7 +278,7 @@ namespace ElasticEmail.generators
                 js.AppendLine("    #endregion");
                 */
 
-                js.AppendLine("}");
+                js.AppendLine("}}));");
 
                 return js.ToString();
             }
