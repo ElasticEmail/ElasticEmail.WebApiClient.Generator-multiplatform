@@ -90,10 +90,10 @@ namespace ElasticEmail.generators
                     if (dataType.IsList)
                     {
                         classesReturnedAsList.Add(dataType.TypeName);
-                        return typeName + "List";
+                        return typeName + "Array";
                     }
                 }
-                if (dataType.IsList) typeName = (forParam ? "Iterable" : "ArrayList") + "<" + typeName + ">";
+                if (dataType.IsList) typeName = (forParam ? "Iterable" : "ArrayList") + "<" + (typeName == "int" ? "Integer" : typeName) + ">";
                 else if (dataType.IsArray) typeName += "[]";
                 //else if (dataType.IsDictionary) typeName = "HashMap<" + typeName + ">";//typeName.Replace("Dictionary", "HashMap");// "HashMap<String, String>";
                 //if (dataType.IsNullable && forParam && typeName == "String") typeName = "@Nullable " + typeName;
@@ -309,6 +309,19 @@ public class API {
 	}
 
 	protected <T> String joinList(ArrayList<T> list){
+		StringBuilder sb = new StringBuilder();
+		
+		for (T item : list){
+			sb.append(item);
+			sb.append(',');
+		}
+		
+		sb.deleteCharAt(sb.length() - 1);
+		
+		return sb.toString();
+	}
+
+    protected <T> String joinList(Iterable<T> list){
 		StringBuilder sb = new StringBuilder();
 		
 		for (T item : list){
@@ -564,7 +577,7 @@ public class ApiTypes {");
 
                 foreach (var cls in classesReturnedAsList.OrderBy(f => f))
                 {
-                    ApiTypesJava.AppendLine("   public static class " + cls + "List extends ArrayList<" + cls + "> { }");
+                    ApiTypesJava.AppendLine("   public static class " + cls + "Array extends ArrayList<" + cls + "> { }");
                     ApiTypesJava.AppendLine();
                 }
                 ApiTypesJava.Append("}");
