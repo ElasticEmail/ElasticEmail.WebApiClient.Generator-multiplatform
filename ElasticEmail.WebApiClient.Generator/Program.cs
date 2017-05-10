@@ -102,7 +102,8 @@ namespace ElasticEmail
             switch (selectedClient)
             {
                 case ClientType.All:
-                    GenerateCS(project);
+                    GenerateCS(project, true);
+                    GenerateCS(project, false);
                     GenerateJava(project);
                     GenerateJS(project);
                     GeneratePerl(project);
@@ -110,7 +111,10 @@ namespace ElasticEmail
                     GeneratePython(project);
                     break;
                 case ClientType.CSharp:
-                    GenerateCS(project);
+                    GenerateCS(project, false);
+                    break;
+                case ClientType.CSharpStandard:
+                    GenerateCS(project, true);
                     break;
                 case ClientType.Java:
                     GenerateJava(project);
@@ -166,10 +170,18 @@ namespace ElasticEmail
             return buffer;
         }
 
-        public static void GenerateCS(APIDocParser.Project project)
-        {
-            var doc = APIDoc.CSGenerator.Generate(project);
-            string clientFilePath = ".\\Clients\\ElasticEmailClient.cs";
+        public static void GenerateCS(APIDocParser.Project project, bool netStandardCompatible)
+        {            
+            var doc = APIDoc.CSGenerator.Generate(project, netStandardCompatible);
+            string clientFilePath = ".\\Clients\\";
+            if (netStandardCompatible)
+            {
+                clientFilePath += "ElasticEmailClientNetStandard.cs";
+            }
+            else
+            {
+                clientFilePath += "ElasticEmailClient.cs";
+            }
             new FileInfo(clientFilePath).Directory.Create();
             File.WriteAllText(clientFilePath, doc);
         }

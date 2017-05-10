@@ -9,6 +9,7 @@ namespace ElasticEmail
     public enum ClientType
     {
         CSharp,
+        CSharpStandard,
         Java,
         JavaScript,
         Perl,

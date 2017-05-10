@@ -12,6 +12,7 @@ namespace ElasticEmail.generators
         public static class CSGenerator
         {
             #region Help methods and variables
+            static bool netstandardCompatible; //if true compatible with frameworks: from net45 up to netstandard
             static Dictionary<string, string> paramCLRTypeToCS = new Dictionary<string, string>
             {
                 { "String", "string" },
@@ -100,36 +101,21 @@ namespace ElasticEmail.generators
             }
             #endregion
 
-            #region Code variables
-            public static string ApiUtilitiesCode =
-    @"using System;
+            #region Code variables      
+                  
+            #region ApiUtilitiesCodeBelow .net45
+            public static string ApiUtilitiesCodeUsingSection= 
+                @"using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Mime;
 using System.Text;
-using System.Collections.Specialized;
-
-
-namespace ElasticEmail.WebApiClient
-{
-    #region Utilities
-    public class ApiResponse<T>
-    {
-        public bool success = false;
-        public string error = null;
-        public T Data
-        {
-            get;
-            set;
-        }
-    }
-
-    public class VoidApiResponse
-    {
-    }
-
+using System.Collections.Specialized;";
+            public static string ApiUtilitiesClassBody =
+                @"    
+    
     public static class ApiUtilities
     {
         public static byte[] HttpPostFile(string url, List<ApiTypes.FileData> fileData, NameValueCollection parameters)
@@ -302,6 +288,276 @@ namespace ElasticEmail.WebApiClient
             return request;
         }
     }
+";
+            #endregion ApiUtilitiesCodeBelow .net45
+
+            #region ApiUtilitiesCodeNetStandard
+            public static string ApiUtilitiesCodeUsingSectionNetStandard =
+  @"using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Text;
+using System.Collections.Specialized;
+using System.Threading.Tasks;";
+            public static string ApiUtilitiesClassBodyNetStandard =
+                @"    
+    
+    public static class ApiUtilities
+    {
+        public static async Task<ApiResponse<T>> PostAsync<T>(string requestAddress, Dictionary<string, string> values)
+        {
+            using (HttpClient client = new HttpClient())
+            {
+                using (var postContent = new FormUrlEncodedContent(values))
+                {
+                    using (HttpResponseMessage response = await client.PostAsync(Api.ApiUri + requestAddress, postContent))
+                    {
+                        await response.EnsureSuccessStatusCodeAsync();
+                        using (HttpContent content = response.Content)
+                        {
+                            string result = await content.ReadAsStringAsync();
+                            ApiResponse<T> apiResponse = ApiResponseValidator.Validate<T>(result);
+                            return apiResponse;
+                        }
+                    }
+                }
+            }
+        }
+  
+        public static async Task<byte[]> HttpPostFileAsync(string url, List<ApiTypes.FileData> fileData, Dictionary<string, string> parameters)
+        {
+            try
+            {
+
+                string boundary = DateTime.Now.Ticks.ToString(""x"");
+                byte[] boundarybytes = Encoding.ASCII.GetBytes(""\r\n--"" + boundary + ""\r\n"");
+
+                HttpWebRequest wr = (HttpWebRequest)WebRequest.Create(url);
+                wr.ContentType = ""multipart/form-data; boundary="" + boundary;
+                wr.Method = ""POST"";
+                wr.Credentials = CredentialCache.DefaultCredentials;
+
+                Stream rs = await wr.GetRequestStreamAsync();
+
+                string formdataTemplate = ""Content-Disposition: form-data; name=\""{0}\""\r\n\r\n{1}"";
+                foreach (string key in parameters.Keys)
+                {
+                    rs.Write(boundarybytes, 0, boundarybytes.Length);
+                    string formitem = string.Format(formdataTemplate, key, parameters[key]);
+                    byte[] formitembytes = Encoding.UTF8.GetBytes(formitem);
+                    rs.Write(formitembytes, 0, formitembytes.Length);
+                }
+
+                if (fileData != null)
+                {
+                    foreach (var file in fileData)
+                    {
+                        rs.Write(boundarybytes, 0, boundarybytes.Length);
+                        string headerTemplate = ""Content-Disposition: form-data; name=\""filefoobarname\""; filename=\""{0}\""\r\nContent-Type: {1}\r\n\r\n"";
+                        string header = string.Format(headerTemplate, file.FileName, file.ContentType);
+                        byte[] headerbytes = Encoding.UTF8.GetBytes(header);
+                        rs.Write(headerbytes, 0, headerbytes.Length);
+                        rs.Write(file.Content, 0, file.Content.Length);
+                    }
+                }
+
+                byte[] trailer = Encoding.ASCII.GetBytes(""\r\n--"" + boundary + ""--\r\n"");
+                rs.Write(trailer, 0, trailer.Length);
+
+
+                using (WebResponse wresp = await wr.GetResponseAsync())
+                {
+                    MemoryStream response = new MemoryStream();
+                    wresp.GetResponseStream().CopyTo(response);
+                            return response.ToArray();
+                }
+            }
+            catch (WebException webError)
+            {
+                // Throw exception with actual error message from response
+                throw new WebException(((HttpWebResponse)webError.Response).StatusDescription, webError, webError.Status, webError.Response);
+            }
+        }
+
+        public static async Task<ApiTypes.FileData> HttpGetFileAsync(string url, Dictionary<string, string> parameters)
+        {
+            try
+            {
+                url = Api.ApiUri + url;
+                string queryString = BuildQueryString(parameters);
+
+                if (queryString.Length > 0) url += ""?"" + queryString.ToString();
+
+                HttpWebRequest wr = (HttpWebRequest)WebRequest.Create(url);
+                wr.Method = ""GET"";
+                wr.Credentials = CredentialCache.DefaultCredentials;
+
+                using (WebResponse wresp = await wr.GetResponseAsync())
+                {
+                    MemoryStream response = new MemoryStream();
+                    wresp.GetResponseStream().CopyTo(response);
+                    if (response.Length == 0) throw new FileNotFoundException();
+                    string cds = wresp.Headers[""Content-Disposition""];
+                    if (cds == null)
+                    {
+                        // This is a special case for critical exceptions
+                        ApiResponse<string> apiRet = Newtonsoft.Json.JsonConvert.DeserializeObject<ApiResponse<string>>(Encoding.UTF8.GetString(response.ToArray()));
+                        if (!apiRet.success) throw new Exception(apiRet.error);
+                        return null;
+                    }
+                    else
+                    {
+                        ApiTypes.FileData fileData = new ApiTypes.FileData();
+                        fileData.Content = response.ToArray();
+                        fileData.ContentType = wresp.ContentType;
+                        fileData.FileName = GetFileNameFromContentDisposition(cds);
+                        return fileData;
+                    }
+                }
+            }
+            catch (WebException webError)
+            {
+                // Throw exception with actual error message from response
+                throw new WebException(((HttpWebResponse)webError.Response).StatusDescription, webError, webError.Status, webError.Response);
+            }
+        }
+
+        public static async Task<byte[]> HttpPutFileAsync(string url, ApiTypes.FileData fileData, Dictionary<string, string> parameters)
+        {
+            try
+            {
+                string queryString = BuildQueryString(parameters);
+
+                if (queryString.Length > 0) url += ""?"" + queryString.ToString();
+
+                HttpWebRequest wr = (HttpWebRequest)WebRequest.Create(url);
+                wr.ContentType = fileData.ContentType ?? ""application/octet-stream"";
+                wr.Method = ""PUT"";
+                
+                wr.Credentials = CredentialCache.DefaultCredentials;
+                wr.Headers[HttpRequestHeader.AcceptEncoding] = ""gzip, deflate"";
+                wr.Headers[""Content-Disposition""] = ""attachment; filename=\"""" + fileData.FileName + ""\""; size="" + fileData.Content.Length;
+
+                Stream rs = await wr.GetRequestStreamAsync();
+                rs.Write(fileData.Content, 0, fileData.Content.Length);
+
+                using (WebResponse wresp = await wr.GetResponseAsync())
+                {
+                    MemoryStream response = new MemoryStream();
+                    wresp.GetResponseStream().CopyTo(response);
+                    return response.ToArray();
+                }
+            }
+            catch (WebException webError)
+            {
+                // Throw exception with actual error message from response
+                throw new WebException(((HttpWebResponse)webError.Response).StatusDescription, webError, webError.Status, webError.Response);
+            }
+        }
+
+        static string BuildQueryString(Dictionary<string, string> parameters)
+        {
+            if (parameters == null || parameters.Count == 0)
+                return null;
+
+            StringBuilder query = new StringBuilder();
+            string amp = string.Empty;
+            foreach (KeyValuePair<string, string> kvp in parameters)
+            {
+                query.Append(amp);
+                query.Append(WebUtility.UrlEncode(kvp.Key));
+                query.Append("" = "");
+                query.Append(WebUtility.UrlEncode(kvp.Value));
+                amp = ""&"";
+            }
+
+            return query.ToString();
+        }
+
+        static string GetFileNameFromContentDisposition(string contentDisposition)
+        {
+            string[] chunks = contentDisposition.Split(';');
+            string searchPhrase = ""filename="";
+            foreach (string chunk in chunks)
+            {
+                int index = contentDisposition.IndexOf(searchPhrase);
+                if (index > 0)
+                {
+                    return contentDisposition.Substring(index + searchPhrase.Length);
+                }
+            }
+            return """";
+        }
+    }
+
+    public static class HttpResponseMessageExtensions
+    {
+        public static async Task EnsureSuccessStatusCodeAsync(this HttpResponseMessage response)
+        {
+            if (response.IsSuccessStatusCode)
+            {
+                return;
+            }
+
+            var content = await response.Content.ReadAsStringAsync();
+
+            if (response.Content != null)
+                response.Content.Dispose();
+            throw new SimpleHttpResponseException(response.StatusCode, content);
+        }
+    }
+
+    public class SimpleHttpResponseException : Exception
+    {
+        public HttpStatusCode StatusCode { get; private set; }
+
+        public SimpleHttpResponseException(HttpStatusCode statusCode, string content) : base(content)
+        {
+            StatusCode = statusCode;
+        }
+    }
+
+    public class ApiResponseValidator
+    {
+        public static ApiResponse<T> Validate<T>(string apiResponse)
+        {
+            ApiResponse<T> apiRet = Newtonsoft.Json.JsonConvert.DeserializeObject<ApiResponse<T>>(apiResponse);
+            if (!apiRet.success)
+            {
+                throw new Exception(apiRet.error);
+            }
+            return apiRet;
+        }
+    }
+";
+            #endregion ApiUtilitiesCodeNetStandard
+
+            public static string ApiUtilitiesCodeBlock1 =
+    @"
+
+
+namespace ElasticEmail.WebApiClient
+{
+    #region Utilities
+    public class ApiResponse<T>
+    {
+        public bool success = false;
+        public string error = null;
+        public T Data
+        {
+            get;
+            set;
+        }
+    }
+
+    public class VoidApiResponse
+    {
+    }";
+public static string ApiUtilitiesCodeBlock2 =
+ @"
     #endregion
 
     public static class Api
@@ -377,16 +633,29 @@ namespace ElasticEmail.WebApiClient
 
             #region Generating methods
 
-            public static string Generate(APIDocParser.Project project)
+            public static string Generate(APIDocParser.Project project, bool netStandardCompatible)
             {
                 var cs = new StringBuilder();
-
+                netstandardCompatible = netStandardCompatible;
                 cs.AppendLine("/*");
                 cs.AppendLine(ApiLicenseSupplier.ApiLicense);
                 cs.AppendLine("*/");
                 cs.AppendLine();
 
-                cs.Append(ApiUtilitiesCode);
+                if (netstandardCompatible)
+                {
+                    cs.Append(ApiUtilitiesCodeUsingSectionNetStandard);
+                    cs.Append(ApiUtilitiesCodeBlock1);
+                    cs.Append(ApiUtilitiesClassBodyNetStandard);
+                    cs.Append(ApiUtilitiesCodeBlock2);
+                }
+                else
+                {
+                    cs.Append(ApiUtilitiesCodeUsingSection);
+                    cs.Append(ApiUtilitiesCodeBlock1);
+                    cs.Append(ApiUtilitiesClassBody);
+                    cs.Append(ApiUtilitiesCodeBlock2);
+                }
 
                 foreach (var cat in project.Categories.OrderBy(f => f.Value.Name))
                     cs.Append(GenerateCategoryCode(cat));
@@ -442,7 +711,21 @@ namespace ElasticEmail.WebApiClient
                 cs.AppendLine("            /// </summary>");
                 cs.AppendLine(string.Join("\r\n", func.Parameters.Select(f => "            /// <param name=\"" + f.Name + "\">" + f.Description + "</param>")));
                 if (func.ReturnType.TypeName != null) cs.AppendLine("            /// <returns>" + GetCSTypeName(func.ReturnType).Replace("<", "(").Replace(">", ")") + "</returns>");
-                cs.Append("            public static " + GetCSTypeName(func.ReturnType) + " " + func.Name + "(");
+                if (netstandardCompatible)
+                {
+                    if (GetCSTypeName(func.ReturnType) == "void")
+                    {
+                        cs.Append("            public static async Task " + func.Name + "Async(");
+                    }
+                    else
+                    {
+                        cs.Append("            public static async Task<" + GetCSTypeName(func.ReturnType) + "> " + func.Name + "Async(");
+                    }
+                }
+                else
+                {
+                    cs.Append("            public static " + GetCSTypeName(func.ReturnType) + " " + func.Name + "(");
+                }
                 bool addComma = false;
                 foreach (var param in func.Parameters)
                 {
@@ -458,24 +741,62 @@ namespace ElasticEmail.WebApiClient
                 cs.AppendLine(")");
                 cs.AppendLine("            {");
                 if (!func.Parameters.Any(f => f.IsFilePostUpload | f.IsFilePutUpload) && !func.ReturnType.IsFile)
-                    cs.AppendLine("                WebClient client = new CustomWebClient();");
-                cs.Append(
-@"                NameValueCollection values = new NameValueCollection();
+                {
+                    if (!netstandardCompatible)
+                    {
+                        cs.AppendLine("                WebClient client = new CustomWebClient();");
+                    }
+                }
+                if (netstandardCompatible)
+                {
+                    cs.Append(
+@"                Dictionary<string, string> values = new Dictionary<string, string>();
                 values.Add(""apikey"", Api.ApiKey);
 ");
+                }
+                else
+                {
+                    cs.Append(
+    @"                NameValueCollection values = new NameValueCollection();
+                values.Add(""apikey"", Api.ApiKey);
+");
+                }
 
                 foreach (var param in func.Parameters)
                     cs.Append(AppendParamToNVC(param));
-
-                cs.Append(ChooseUploadMethod(func, cat));
+                bool uploadMethosIsPostAsync;
+                cs.Append(ChooseUploadMethod(func, cat, out uploadMethosIsPostAsync));
                 if (!func.ReturnType.IsFile)
                 {
-                    cs.AppendLine("                ApiResponse<" + GetCSTypeName(func.ReturnType, "VoidApiResponse") + "> apiRet = Newtonsoft.Json.JsonConvert.DeserializeObject<ApiResponse<" + GetCSTypeName(func.ReturnType, "VoidApiResponse") + ">>(Encoding.UTF8.GetString(apiResponse));");
-                    cs.AppendLine("                if (!apiRet.success) throw new ApplicationException(apiRet.error);");
-
-                    if (func.ReturnType.TypeName != null)
+                    if (netstandardCompatible)
                     {
-                        cs.AppendLine("                return apiRet.Data;");
+                        if (uploadMethosIsPostAsync)
+                        {
+                            if (func.ReturnType.TypeName != null)
+                            {
+                                cs.AppendLine("                return apiResponse.Data;");
+                            }
+                        }
+                        else
+                        {
+                            cs.AppendLine("                ApiResponse<" + GetCSTypeName(func.ReturnType, "VoidApiResponse") + "> apiRet = Newtonsoft.Json.JsonConvert.DeserializeObject<ApiResponse<" + GetCSTypeName(func.ReturnType, "VoidApiResponse") + ">>(Encoding.UTF8.GetString(apiResponse));");
+                            cs.AppendLine("                if (!apiRet.success) throw new Exception(apiRet.error);");
+
+                            if (func.ReturnType.TypeName != null)
+                            {
+                                cs.AppendLine("                return apiRet.Data;");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        cs.AppendLine("                ApiResponse<" + GetCSTypeName(func.ReturnType, "VoidApiResponse") + "> apiRet = Newtonsoft.Json.JsonConvert.DeserializeObject<ApiResponse<" + GetCSTypeName(func.ReturnType, "VoidApiResponse") + ">>(Encoding.UTF8.GetString(apiResponse));");
+                        cs.AppendLine("                if (!apiRet.success) throw new ApplicationException(apiRet.error);");
+
+                        if (func.ReturnType.TypeName != null)
+                        {
+                            cs.AppendLine("                return apiRet.Data;");
+                        }
                     }
                 }
 
@@ -533,10 +854,10 @@ namespace ElasticEmail.WebApiClient
                 return cs.ToString();
             }
 
-            public static string ChooseUploadMethod(APIDocParser.Function func, KeyValuePair<string, APIDocParser.Category> cat)
+            public static string ChooseUploadMethod(APIDocParser.Function func, KeyValuePair<string, APIDocParser.Category> cat, out bool uploadMethosIsPostAsync)
             {
                 StringBuilder cs = new StringBuilder();
-
+                uploadMethosIsPostAsync = false;
                 if (func.Parameters.Any(f => f.IsFilePostUpload == true))
                 {
                     var subParam = func.Parameters.First(f => f.IsFilePostUpload);
@@ -547,15 +868,49 @@ namespace ElasticEmail.WebApiClient
                         filesLineToAppend += "new List<ApiTypes.FileData>() { " + subParam.Name + " }";
                     else
                         filesLineToAppend += subParam.Name + ".ToList()";
-
-                    cs.AppendLine("                byte[] apiResponse = ApiUtilities.HttpPostFile(Api.ApiUri + \"/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "\", " + filesLineToAppend + ", values);");
+                    if (netstandardCompatible)
+                    {
+                        cs.AppendLine("                byte[] apiResponse = await ApiUtilities.HttpPostFileAsync(\"/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "\", " + filesLineToAppend + ", values);");
+                    }
+                    else
+                    {
+                        cs.AppendLine("                byte[] apiResponse = ApiUtilities.HttpPostFile(Api.ApiUri + \"/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "\", " + filesLineToAppend + ", values);");
+                    }
                 }
                 else if (func.Parameters.Any(f => f.IsFilePutUpload == true))
-                    cs.AppendLine("                byte[] apiResponse = ApiUtilities.HttpPutFile(Api.ApiUri + \"/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "\", " + func.Parameters.First(f => f.IsFilePutUpload).Name + ", values);");
+                {
+                    if (netstandardCompatible)
+                    {
+                        cs.AppendLine("                byte[] apiResponse = await ApiUtilities.HttpPutFileAsync(\"/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "\", " + func.Parameters.First(f => f.IsFilePutUpload).Name + ", values);");
+                    }
+                    else
+                    {
+                        cs.AppendLine("                byte[] apiResponse = ApiUtilities.HttpPutFile(Api.ApiUri + \"/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "\", " + func.Parameters.First(f => f.IsFilePutUpload).Name + ", values);");
+                    }
+                }
                 else if (func.ReturnType.IsFile)
-                    cs.AppendLine("                return ApiUtilities.HttpGetFile(Api.ApiUri + \"/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "\", values);");
+                {
+                    if (netstandardCompatible)
+                    {
+                        cs.AppendLine("                return await ApiUtilities.HttpGetFileAsync(\"/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "\", values);");
+                    }
+                    else
+                    {
+                        cs.AppendLine("                return ApiUtilities.HttpGetFile(Api.ApiUri + \"/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "\", values);");
+                    }
+                }
                 else
-                    cs.AppendLine("                byte[] apiResponse = client.UploadValues(Api.ApiUri + \"/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "\", values);");
+                {
+                    if (netstandardCompatible)
+                    {
+                        uploadMethosIsPostAsync = true;
+                        cs.AppendLine("                ApiResponse<" + GetCSTypeName(func.ReturnType, "VoidApiResponse") + "> apiResponse = await ApiUtilities.PostAsync<" + GetCSTypeName(func.ReturnType, "VoidApiResponse") + ">(\"/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "\", values);");
+                    }
+                    else
+                    {
+                        cs.AppendLine("                byte[] apiResponse = client.UploadValues(Api.ApiUri + \"/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "\", values);");
+                    }
+                }
 
                 return cs.ToString();
             }
