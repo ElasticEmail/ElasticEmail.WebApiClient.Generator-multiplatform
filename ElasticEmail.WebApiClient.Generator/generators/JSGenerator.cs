@@ -163,12 +163,12 @@ var reqRequest = function request (target, query, callback, method) {
       }
 
 //Method to upload file with get params
-var uploadPostFile = function uploadPostFile(target, fileObj, query, callback) {
+var uploadPostFile = function uploadPostFile(target, query, callback) {
         var fd = new FormData();
         var xhr = new XMLHttpRequest();
         query.apikey = cfg.ApiKey;
         var queryString = parameterize(query);
-        fd.append('foobarfilename', fileObj);
+        fd.append('foobarfilename', query.file);
         xhr.open('POST', cfg.ApiUri + 'v' + cfg.Version + target + queryString, true);
         xhr.onload = function (e) {
             var result = e.target.responseText;
@@ -210,21 +210,26 @@ var uploadPostFile = function uploadPostFile(target, fileObj, query, callback) {
                         var parameters = func.Parameters.Where(f => f.Name != "apikey").ToArray();
                         js.AppendLine("    /**");
                         js.AppendLine("     * " + func.Summary);
-                        js.AppendLine(string.Join("\r\n", parameters.Select(f => "     * @param {" + GetJSTypeName(f.Type) + "} " + f.Name + " - " + f.Description)));
+                        js.AppendLine("     * @param {Object} query - Query object.");
+                        js.AppendLine(string.Join("\r\n", parameters.Select(f => "     * @param {" + GetJSTypeName(f.Type) + "} query." + f.Name + " - " + f.Description)));                       
                         js.AppendLine("     * @param {Function} callback");
                         if (func.ReturnType.TypeName != null) js.AppendLine("     * @return {" + GetJSTypeName(func.ReturnType) + "}");
                         js.AppendLine("     */");
                         js.Append("    " + cat.Value.Name.ToLower() + "." + func.Name + " = function (");
-                        js.Append(string.Join(", ", parameters.Select(f => f.Name)));
-                        if (parameters.Any()) js.Append(", ");
+                        //js.Append(string.Join(", ", parameters.Select(f => f.Name)));                        
+                        js.Append("query, ");
                         js.AppendLine("callback) {");
-                        js.AppendLine(string.Join("\r\n", parameters.Where(f => f.HasDefaultValue).Select(param => string.Format("        {0} = typeof {0} !== 'undefined' ? {0} : {1};", param.Name, FormatJSDefaultValue(param)))));
-
+                        //js.AppendLine(string.Join("\r\n", parameters.Where(f => f.HasDefaultValue).Select(param => string.Format("        {0} = typeof {0} !== 'undefined' ? {0} : {1};", param.Name, FormatJSDefaultValue(param)))));
+                        js.Append(@"        if (typeof query === 'function' && callback === undefined ) {
+            callback = query;
+            query = {};
+        };");
                         if (parameters.Any(f => f.IsFilePostUpload == true))
                         {
-                            js.AppendLine("        uploadPostFile('/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "', " +
-                                parameters.First(f => f.IsFilePostUpload).Name + ", " +
-                                "{" + string.Join(", ", parameters.Where(f => !f.IsFilePostUpload).Select(f => f.Name + ": " + f.Name)) + "}, callback);");
+                            //js.AppendLine("        uploadPostFile('/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "', " +
+                            //    parameters.First(f => f.IsFilePostUpload).Name + ", " +
+                            //    "{" + string.Join(", ", parameters.Where(f => !f.IsFilePostUpload).Select(f => f.Name + ": " + f.Name)) + "}, callback);");
+                            js.AppendLine("\r\n         uploadPostFile('/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "', query, callback);");
                         }
                         //else if (func.Parameters.Any(f => f.IsFilePutUpload == true))
                         //{
@@ -232,8 +237,10 @@ var uploadPostFile = function uploadPostFile(target, fileObj, query, callback) {
                         //}
                         else
                         {
-                            js.AppendLine("        request('/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "', " +
-                                "{" + string.Join(", ", parameters.Select(f => f.Name + ": " + f.Name)) + "}, callback, 'POST');");
+                            //js.AppendLine("        request('/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "', " +
+                            //    "{" + string.Join(", ", parameters.Select(f => f.Name + ": " + f.Name)) + "}, callback, 'POST');");
+                            js.AppendLine("\r\n         request('/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "', " +
+                                 "query, callback, 'POST');");
                         }
 
                         js.AppendLine("    };");
