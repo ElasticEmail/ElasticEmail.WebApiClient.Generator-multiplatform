@@ -331,7 +331,7 @@ using System.Threading.Tasks;";
         {
             try
             {
-
+                url = Api.ApiUri + url;
                 string boundary = DateTime.Now.Ticks.ToString(""x"");
                 byte[] boundarybytes = Encoding.ASCII.GetBytes(""\r\n--"" + boundary + ""\r\n"");
 
@@ -429,6 +429,7 @@ using System.Threading.Tasks;";
         {
             try
             {
+                url = Api.ApiUri + url;
                 string queryString = BuildQueryString(parameters);
 
                 if (queryString.Length > 0) url += ""?"" + queryString.ToString();
