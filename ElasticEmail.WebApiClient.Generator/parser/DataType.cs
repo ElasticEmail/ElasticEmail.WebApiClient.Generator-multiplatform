@@ -10,6 +10,8 @@ namespace ElasticEmail
         public class DataType
         {
             public string TypeName { get; set; }
+            public string DefaultValue { get; set; }
+            public DataType[] SubTypes { get; set; }
             public bool IsList { get; set; }
             public bool IsNullable { get; set; }
             public bool IsPrimitive { get; set; }

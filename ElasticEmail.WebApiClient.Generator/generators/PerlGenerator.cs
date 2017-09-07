@@ -5,9 +5,8 @@ using System.Linq;
 using System.Text;
 using System.Web;
 
-namespace ElasticEmail.generators
+namespace ElasticEmail
 {
-
     public static partial class APIDoc
     {
         public static class PerlGenerator
@@ -92,7 +91,7 @@ namespace ElasticEmail.generators
 
                     string def = param.DefaultValue;
                     //def = def.ToLowerInvariant();
-                    if (param.Type.TypeName == "String") def = "\"" + def + "\"";
+                    if (param.Type.TypeName.Equals("String", StringComparison.OrdinalIgnoreCase)) def = "\"" + def + "\"";
                     return def;
                 }
 
@@ -120,13 +119,9 @@ namespace ElasticEmail.generators
 @"#!/usr/bin/perl
 
 "
-
 +
-
 "#" + ApiLicenseSupplier.ApiLicense.Replace("\n", "\n#")
-
 +
-
 @"
 
 use strict;
@@ -136,6 +131,7 @@ use warnings;
 package Api;  
 use LWP::UserAgent;
 use File::Basename;
+
 
 our $mainApi= new Api(""00000000-0000-0000-0000-000000000000"", 'example@email.com', 'https://api.elasticemail.com/v2/');
 
@@ -162,11 +158,16 @@ sub Request
 	  
 	my $response;
 	if ($requestType eq ""GET""){
-        my $fullURL = $self->{url}.""/"".$urlLocal.""?apikey="".$self->{apikey};
+        my $fullURL = $self->{url}.$urlLocal.""?"";
+		for(my $i = 0; $i < scalar @allTheData - 1; $i += 2){
+			if(!defined $allTheData[$i+1]) { next; }
+			$fullURL = $fullURL.$allTheData[$i]."" = "".$allTheData[$i+1]."" & "";
+        }
+        chop($fullURL);
         $response = $ua->get($fullURL);
 	}
     elsif($requestType eq ""POST""){
-        my $fullURL = $self->{ url}.""/"".$urlLocal;
+        my $fullURL = $self->{url}.$urlLocal;
         my $num = 0;
         my $file;
         foreach $file(@postFilesPaths){
@@ -220,12 +221,12 @@ sub Request
                     pl.Append(GenerateClassCode(cls));
 
                 pl.AppendLine(
-@"# EXAMPLE USAGE: 
+@"# SAMPLE USAGE: 
 #package main;
 
-# my @postFiles = (""localfile.txt"", ""C:\path\to\file\file.csv"");
-# my @params = [subject => 'mysubject', body_text => 'Hello World', to => 'example@email.com', from => 'example@email.com', ...more params];
-# my $response = Api::Email->Send(@params, @postFiles);
+# my @postFiles = (""localfile.txt"", ""C:\path\to\file\file.csv"");  
+# my $response = Api::Email->Send('mysubject', 'myemail@gmail.com', undef, undef, undef, undef, undef, undef, undef, 'recipient@gmail.com', 
+# undef, undef, undef, undef, undef, undef, undef, undef, 'Hello World', undef, undef, undef, ApiTypes::EncodingType->BASE64, undef, undef, undef, undef, undef, undef, 'True', @postFiles);
 # print $response, ""\n""");
 
                 return pl.ToString();
@@ -312,7 +313,7 @@ package Api::{cat.Value.Name};");
                 pl.AppendLine("];");
 
                 // return and request call
-                pl.Append("        return $Api::mainApi->Request('" + cat.Value.Name.ToLower() + "/" + func.Name.ToLower() + "', \"" + requestType + "\", \\@params");
+                pl.Append("        return $Api::mainApi->Request('" + cat.Value.Name.ToLower() + "/" + func.Name.ToLower() + "', \"" + requestType + "\", " + (requestType == "POST" ? "\\" : string.Empty) + "@params");
                 if (paramFile != null)
                     pl.Append(", \\@_");
                 pl.AppendLine(");");
@@ -372,6 +373,16 @@ package Api::{cat.Value.Name};");
                 pl.AppendLine();
                 return pl.ToString();
             }
+
+            public static string BuildCodeSampleForMethod(APIDocParser.Function func, KeyValuePair<string, APIDocParser.Category> cat)
+            {
+                StringBuilder pl = new StringBuilder();
+
+                pl.Append("Hello world");
+
+                return pl.ToString();
+            }
+
             #endregion
 
         }

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Web;
 
-namespace ElasticEmail.generators
+namespace ElasticEmail
 {
     public static partial class APIDoc
     {
@@ -64,7 +64,7 @@ namespace ElasticEmail.generators
                     {
                         string def = param.DefaultValue;
                         def = def.ToLowerInvariant();
-                        if (param.Type.TypeName == "String" || !param.Type.IsPrimitive) def = "'" + def + "'";
+                        if (param.Type.TypeName.Equals("String", StringComparison.OrdinalIgnoreCase) || !param.Type.IsPrimitive) def = "'" + def + "'";
                         return def;
                     }
                 }
@@ -79,20 +79,15 @@ namespace ElasticEmail.generators
                 var js = new StringBuilder();
 
                 js.Append(
-                    @"(function ( root, factory ) {
-    if ( typeof define === ""function"" && define.amd ) {
-        define([""jquery""], factory);
-            } else if ( typeof exports === ""object"" ) {
-        module.exports = factory( false, require( 'request' ), require( 'querystring' ) );
-    } else {
-        root.EEAPI = factory(root.$ );
-    }
-}(this, function ( $, req, querystring ) {
-    return function EEAPI(options) {
+                    @"function EEAPI(options) {
 
-    
-    var that = {};
-    var cfg = {
+    /* region Initialization */
+    if (!window.jQuery) {
+        return false;
+    }
+    var $ = window.jQuery;
+    var that = {Account: {}, Attachment: {}, Campaign: {}, Contact: {}, Domain: {}, List: {}, Segments: {}, SMS: {}, Status: {}, Template: {}};
+    var cfg = $.extend({
         ApiUri: ""https://api.elasticemail.com/"",
         ApiKey: """",
         Version: 2,
@@ -107,13 +102,13 @@ namespace ElasticEmail.generators
         },
         always: function () {
         }
-    };
+    }, options);
     /* endregion Initialization */
 
     /* region Utilities */
-   
+
     //Main request method
-    var ajaxRequest = function request(target, query, callback, method) {
+    var request = function request(target, query, callback, method) {
         if (method !== ""POST"") {
             method = ""GET"";
         }
@@ -133,42 +128,14 @@ namespace ElasticEmail.generators
             callback(response.data || false);
         }).fail(cfg.fail).always(cfg.always);
     };
-var request;
-var reqRequest = function request (target, query, callback, method) {
 
-        if (method !== ""POST"") {
-            method = ""GET"";
-            }
-            query.apikey = cfg.ApiKey;
-        req({
-                uri: cfg.ApiUri + 'v' + cfg.Version + target + ""?"" + querystring.stringify(query),
-          method: method,
-          //'content-type': 'application/json',
-          data: JSON.stringify(query)
-        }, function(error, response, body)
-            {
-                if (error) return callback(error);
-                var res = JSON.parse(body);
-                if (!res.success) return callback(res.error);
-                callback(res.data);
-            })
-        };
-
-      if ($ === false && req && querystring) {
-        Object.assign(cfg, options);
-        request = reqRequest;
-      } else {
-        cfg = $.extend(cfg, options);
-    request = ajaxRequest;
-      }
-
-//Method to upload file with get params
-var uploadPostFile = function uploadPostFile(target, query, callback) {
+    //Method to upload file with get params
+    var uploadPostFile = function uploadPostFile(target, fileObj, query, callback) {
         var fd = new FormData();
         var xhr = new XMLHttpRequest();
         query.apikey = cfg.ApiKey;
         var queryString = parameterize(query);
-        fd.append('foobarfilename', query.file);
+        fd.append('foobarfilename', fileObj);
         xhr.open('POST', cfg.ApiUri + 'v' + cfg.Version + target + queryString, true);
         xhr.onload = function (e) {
             var result = e.target.responseText;
@@ -210,26 +177,21 @@ var uploadPostFile = function uploadPostFile(target, query, callback) {
                         var parameters = func.Parameters.Where(f => f.Name != "apikey").ToArray();
                         js.AppendLine("    /**");
                         js.AppendLine("     * " + func.Summary);
-                        js.AppendLine("     * @param {Object} query - Query object.");
-                        js.AppendLine(string.Join("\r\n", parameters.Select(f => "     * @param {" + GetJSTypeName(f.Type) + "} query." + f.Name + " - " + f.Description)));                       
+                        js.AppendLine(string.Join("\r\n", parameters.Select(f => "     * @param {" + GetJSTypeName(f.Type) + "} " + f.Name + " - " + f.Description)));
                         js.AppendLine("     * @param {Function} callback");
                         if (func.ReturnType.TypeName != null) js.AppendLine("     * @return {" + GetJSTypeName(func.ReturnType) + "}");
                         js.AppendLine("     */");
                         js.Append("    " + cat.Value.Name.ToLower() + "." + func.Name + " = function (");
-                        //js.Append(string.Join(", ", parameters.Select(f => f.Name)));                        
-                        js.Append("query, ");
+                        js.Append(string.Join(", ", parameters.Select(f => f.Name)));
+                        if (parameters.Any()) js.Append(", ");
                         js.AppendLine("callback) {");
-                        //js.AppendLine(string.Join("\r\n", parameters.Where(f => f.HasDefaultValue).Select(param => string.Format("        {0} = typeof {0} !== 'undefined' ? {0} : {1};", param.Name, FormatJSDefaultValue(param)))));
-                        js.Append(@"        if (typeof query === 'function' && callback === undefined ) {
-            callback = query;
-            query = {};
-        };");
+                        js.AppendLine(string.Join("\r\n", parameters.Where(f => f.HasDefaultValue).Select(param => string.Format("        {0} = typeof {0} !== 'undefined' ? {0} : {1};", param.Name, FormatJSDefaultValue(param)))));
+
                         if (parameters.Any(f => f.IsFilePostUpload == true))
                         {
-                            //js.AppendLine("        uploadPostFile('/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "', " +
-                            //    parameters.First(f => f.IsFilePostUpload).Name + ", " +
-                            //    "{" + string.Join(", ", parameters.Where(f => !f.IsFilePostUpload).Select(f => f.Name + ": " + f.Name)) + "}, callback);");
-                            js.AppendLine("\r\n         uploadPostFile('/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "', query, callback);");
+                            js.AppendLine("        uploadPostFile('/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "', " +
+                                parameters.First(f => f.IsFilePostUpload).Name + ", " +
+                                "{" + string.Join(", ", parameters.Where(f => !f.IsFilePostUpload).Select(f => f.Name + ": " + f.Name)) + "}, callback);");
                         }
                         //else if (func.Parameters.Any(f => f.IsFilePutUpload == true))
                         //{
@@ -237,10 +199,8 @@ var uploadPostFile = function uploadPostFile(target, query, callback) {
                         //}
                         else
                         {
-                            //js.AppendLine("        request('/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "', " +
-                            //    "{" + string.Join(", ", parameters.Select(f => f.Name + ": " + f.Name)) + "}, callback, 'POST');");
-                            js.AppendLine("\r\n         request('/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "', " +
-                                 "query, callback, 'POST');");
+                            js.AppendLine("        request('/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "', " +
+                                "{" + string.Join(", ", parameters.Select(f => f.Name + ": " + f.Name)) + "}, callback, 'POST');");
                         }
 
                         js.AppendLine("    };");
@@ -253,7 +213,7 @@ var uploadPostFile = function uploadPostFile(target, query, callback) {
 
                 js.AppendLine("    /*-- PUBLIC METHODS --*/");
                 js.AppendLine("    that.setApiKey = setApiKey;");
-                js.AppendLine(string.Join("\r\n", project.Categories.OrderBy(f => f.Value.Name).Select(f => string.Format("    that.{0} = {1};", f.Value.NameLocal, f.Value.Name.ToLower()))));
+                js.AppendLine(string.Join("\r\n", project.Categories.OrderBy(f => f.Value.Name).Select(f => string.Format("    that.{0} = {0};", f.Value.Name.ToLower()))));
                 js.AppendLine("    return that;");
                 js.AppendLine();
 
@@ -285,7 +245,16 @@ var uploadPostFile = function uploadPostFile(target, query, callback) {
                 js.AppendLine("    #endregion");
                 */
 
-                js.AppendLine("}}));");
+                js.AppendLine("}");
+
+                return js.ToString();
+            }
+
+            public static string BuildCodeSampleForMethod(APIDocParser.Function func, KeyValuePair<string, APIDocParser.Category> cat)
+            {
+                StringBuilder js = new StringBuilder();
+
+                js.Append("Hello world");
 
                 return js.ToString();
             }

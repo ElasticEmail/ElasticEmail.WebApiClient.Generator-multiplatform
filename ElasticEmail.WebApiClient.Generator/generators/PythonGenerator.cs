@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Web;
 
-namespace ElasticEmail.generators
+namespace ElasticEmail
 {
     public static partial class APIDoc
     {
@@ -91,7 +91,7 @@ namespace ElasticEmail.generators
 
                     string def = param.DefaultValue;
                     //def = def.ToLowerInvariant();
-                    if (param.Type.TypeName == "String") def = "\"" + def + "\"";
+                    if (param.Type.TypeName.Equals("String", StringComparison.OrdinalIgnoreCase)) def = "\"" + def + "\"";
                     return def;
                 }
 
@@ -120,6 +120,7 @@ namespace ElasticEmail.generators
 import json
 from enum import Enum
 
+
 class ApiClient:
 	apiUri = 'https://api.elasticemail.com/v2'
 	apiKey = '00000000-0000-0000-0000-0000000000000'
@@ -132,12 +133,9 @@ class ApiClient:
 			result = requests.put(ApiClient.apiUri + url, params = data)
 		elif method == 'GET':
 			attach = ''
-			for key in data:
-				if data[key] != None:
-						attach = attach + key + '=' + str(data[key]) + '&'
-			url = url + '?' + attach[:-1]
-			print(url)
-			result = requests.get(ApiClient.apiUri + url)	
+			params = { k: v for k, v in data.items() if v != None } 
+			result = requests.get(ApiClient.apiUri + url, params = params) 
+			print(result.url) 	
 			
 		jsonMy = result.json()
 		
@@ -313,6 +311,15 @@ $@"        attachments = []
         """"""");
 
                 py.AppendLine();
+
+                return py.ToString();
+            }
+
+            public static string BuildCodeSampleForMethod(APIDocParser.Function func, KeyValuePair<string, APIDocParser.Category> cat)
+            {
+                StringBuilder py = new StringBuilder();
+
+                py.Append("Hello world");
 
                 return py.ToString();
             }

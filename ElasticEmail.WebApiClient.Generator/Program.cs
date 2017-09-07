@@ -5,7 +5,6 @@ using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
-using ElasticEmail.generators;
 using Newtonsoft.Json;
 using System.Globalization;
 
@@ -65,6 +64,7 @@ namespace ElasticEmail
             }
 
             string url = "https://api.elasticemail.com";
+            //string url = "http://test3.elasticemail.com";
             if (args.Length > 1)
                 url = IsURL(args[0]) ? args[0] : (IsURL(args[1]) ? args[1] : url);
 

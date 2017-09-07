@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Web;
 
-namespace ElasticEmail.generators
+namespace ElasticEmail
 {
     public static partial class APIDoc
     {
@@ -48,15 +48,13 @@ namespace ElasticEmail.generators
                 string typeName = dataType.TypeName;
                 if (dataType.IsDictionary)
                 {
-                    string[] subtypes = typeName.Split(',');
-                    for (int i = 0; i < 2; i++)
-                    {
-                        var tmpName = subtypes[i];
-                        bool wasFound = paramCLRTypeToCS.TryGetValue(tmpName, out subtypes[i]);
-                        if (!wasFound) subtypes[i] = "ApiTypes." + tmpName;
-                    }
-                    // subtypes.ForEach((f) => { paramCLRTypeToCS.TryGetValue(f, out f); });
-                    typeName = "Dictionary<" + subtypes[0] + ", " + subtypes[1] + ">";
+                    string subOut1 = string.Empty;
+                    string subOut2 = string.Empty;
+                    string subType1 = GetCSTypeName(dataType.SubTypes[0]);
+                    string subType2 = GetCSTypeName(dataType.SubTypes[1]);
+                    if (paramCLRTypeToCS.TryGetValue(subType1, out subOut1) == false) subOut1 = subType1;
+                    if (paramCLRTypeToCS.TryGetValue(subType2, out subOut2) == false) subOut2 = subType2;
+                    typeName = "Dictionary<" + subOut1 + ", " + subOut2 + ">";
                     return typeName;
                 }
 
@@ -92,8 +90,8 @@ namespace ElasticEmail.generators
                         return "ApiTypes." + param.Type.TypeName + "." + param.DefaultValue;
 
                     string def = param.DefaultValue;
-                    def = def.ToLowerInvariant();
-                    if (param.Type.TypeName == "String") def = "\"" + def + "\"";
+                    def = def?.ToLowerInvariant();
+                    if (param.Type.TypeName.Equals("String", StringComparison.OrdinalIgnoreCase)) def = "\"" + def + "\"";
                     return def;
                 }
 
@@ -102,9 +100,9 @@ namespace ElasticEmail.generators
             #endregion
 
             #region Code variables      
-                  
+
             #region ApiUtilitiesCodeBelow .net45
-            public static string ApiUtilitiesCodeUsingSection= 
+            public static string ApiUtilitiesCodeUsingSection =
                 @"using System;
 using System.Collections.Generic;
 using System.IO;
@@ -557,8 +555,8 @@ namespace ElasticEmail.WebApiClient
     public class VoidApiResponse
     {
     }";
-public static string ApiUtilitiesCodeBlock2 =
- @"
+            public static string ApiUtilitiesCodeBlock2 =
+             @"
     #endregion
 
     public static class Api
@@ -567,7 +565,8 @@ public static string ApiUtilitiesCodeBlock2 =
         public static string ApiUri = ""https://api.elasticemail.com/v2"";
 
 ";
-            public static string FileDataCode = @"    /// <summary>
+            public static string FileDataCode =
+@"    /// <summary>
     /// File response from the server
     /// </summary>
     public class FileData
@@ -613,7 +612,7 @@ public static string ApiUtilitiesCodeBlock2 =
         {
             Content = File.ReadAllBytes(pathWithFileName);
             FileName = Path.GetFileName(pathWithFileName);
-            ContentType = null;
+            ContentType = System.Web.MimeMapping.GetMimeMapping(FileName);
         }
 
         /// <summary>
@@ -666,7 +665,7 @@ public static string ApiUtilitiesCodeBlock2 =
     #region Api Types
     public static class ApiTypes
     {{
-    {FileDataCode}
+{FileDataCode}
     #pragma warning disable 0649");
 
                 foreach (var cls in project.Classes.OrderBy(f => f.Name))
@@ -708,25 +707,11 @@ public static string ApiUtilitiesCodeBlock2 =
                 StringBuilder cs = new StringBuilder();
 
                 cs.AppendLine("            /// <summary>");
-                cs.AppendLine("            /// " + func.Summary);
+                cs.Append("            /// ").AppendLine(func.Summary);
                 cs.AppendLine("            /// </summary>");
                 cs.AppendLine(string.Join("\r\n", func.Parameters.Select(f => "            /// <param name=\"" + f.Name + "\">" + f.Description + "</param>")));
-                if (func.ReturnType.TypeName != null) cs.AppendLine("            /// <returns>" + GetCSTypeName(func.ReturnType).Replace("<", "(").Replace(">", ")") + "</returns>");
-                if (netstandardCompatible)
-                {
-                    if (GetCSTypeName(func.ReturnType) == "void")
-                    {
-                        cs.Append("            public static async Task " + func.Name + "Async(");
-                    }
-                    else
-                    {
-                        cs.Append("            public static async Task<" + GetCSTypeName(func.ReturnType) + "> " + func.Name + "Async(");
-                    }
-                }
-                else
-                {
-                    cs.Append("            public static " + GetCSTypeName(func.ReturnType) + " " + func.Name + "(");
-                }
+                if (func.ReturnType.TypeName != null) cs.Append("            /// <returns>").Append(GetCSTypeName(func.ReturnType).Replace("<", "(").Replace(">", ")")).AppendLine("</returns>");
+                cs.Append("            public static ").Append(GetCSTypeName(func.ReturnType)).Append(" ").Append(func.Name).Append("(");
                 bool addComma = false;
                 foreach (var param in func.Parameters)
                 {
@@ -734,70 +719,32 @@ public static string ApiUtilitiesCodeBlock2 =
                         continue;
 
                     if (addComma) cs.Append(", ");
-                    cs.Append(GetCSTypeName(param.Type, forParam: true) + " " + param.Name);
+                    cs.Append(GetCSTypeName(param.Type, forParam: true)).Append(" ").Append(param.Name);
                     if (param.HasDefaultValue)
-                        cs.Append(" = " + FormatCSDefaultValue(param));
+                        cs.Append(" = ").Append(FormatCSDefaultValue(param));
                     addComma = true;
                 }
                 cs.AppendLine(")");
                 cs.AppendLine("            {");
                 if (!func.Parameters.Any(f => f.IsFilePostUpload | f.IsFilePutUpload) && !func.ReturnType.IsFile)
-                {
-                    if (!netstandardCompatible)
-                    {
-                        cs.AppendLine("                WebClient client = new CustomWebClient();");
-                    }
-                }
-                if (netstandardCompatible)
-                {
-                    cs.Append(
-@"                Dictionary<string, string> values = new Dictionary<string, string>();
+                    cs.AppendLine("                WebClient client = new CustomWebClient();");
+                cs.Append(
+@"                NameValueCollection values = new NameValueCollection();
                 values.Add(""apikey"", Api.ApiKey);
 ");
-                }
-                else
-                {
-                    cs.Append(
-    @"                NameValueCollection values = new NameValueCollection();
-                values.Add(""apikey"", Api.ApiKey);
-");
-                }
 
                 foreach (var param in func.Parameters)
                     cs.Append(AppendParamToNVC(param));
-                bool uploadMethosIsPostAsync;
-                cs.Append(ChooseUploadMethod(func, cat, out uploadMethosIsPostAsync));
+
+                cs.Append(ChooseUploadMethod(func, cat));
                 if (!func.ReturnType.IsFile)
                 {
-                    if (netstandardCompatible)
-                    {
-                        if (uploadMethosIsPostAsync)
-                        {
-                            if (func.ReturnType.TypeName != null)
-                            {
-                                cs.AppendLine("                return apiResponse.Data;");
-                            }
-                        }
-                        else
-                        {
-                            cs.AppendLine("                ApiResponse<" + GetCSTypeName(func.ReturnType, "VoidApiResponse") + "> apiRet = Newtonsoft.Json.JsonConvert.DeserializeObject<ApiResponse<" + GetCSTypeName(func.ReturnType, "VoidApiResponse") + ">>(Encoding.UTF8.GetString(apiResponse));");
-                            cs.AppendLine("                if (!apiRet.success) throw new Exception(apiRet.error);");
+                    cs.Append("                ApiResponse<").Append(GetCSTypeName(func.ReturnType, "VoidApiResponse")).Append("> apiRet = Newtonsoft.Json.JsonConvert.DeserializeObject<ApiResponse<").Append(GetCSTypeName(func.ReturnType, "VoidApiResponse")).AppendLine(">>(Encoding.UTF8.GetString(apiResponse));");
+                    cs.AppendLine("                if (!apiRet.success) throw new ApplicationException(apiRet.error);");
 
-                            if (func.ReturnType.TypeName != null)
-                            {
-                                cs.AppendLine("                return apiRet.Data;");
-                            }
-                        }
-                    }
-                    else
+                    if (func.ReturnType.TypeName != null)
                     {
-                        cs.AppendLine("                ApiResponse<" + GetCSTypeName(func.ReturnType, "VoidApiResponse") + "> apiRet = Newtonsoft.Json.JsonConvert.DeserializeObject<ApiResponse<" + GetCSTypeName(func.ReturnType, "VoidApiResponse") + ">>(Encoding.UTF8.GetString(apiResponse));");
-                        cs.AppendLine("                if (!apiRet.success) throw new ApplicationException(apiRet.error);");
-
-                        if (func.ReturnType.TypeName != null)
-                        {
-                            cs.AppendLine("                return apiRet.Data;");
-                        }
+                        cs.AppendLine("                return apiRet.Data;");
                     }
                 }
 
@@ -818,29 +765,29 @@ public static string ApiUtilitiesCodeBlock2 =
 
                 if (param.Type.IsPrimitive == false && param.Type.IsEnum == false)
                     cspar = "Newtonsoft.Json.JsonConvert.SerializeObject(" + cspar + ")";
-                else if (param.Type.TypeName != "String" && param.Type.IsList == false && param.Type.IsArray == false)
+                else if (!param.Type.TypeName.Equals("String", StringComparison.OrdinalIgnoreCase) && param.Type.IsList == false && param.Type.IsArray == false)
                     cspar += ".ToString(" + (param.Type.TypeName == "DateTime" ? "\"M/d/yyyy h:mm:ss tt\"" : string.Empty) + ")";
 
                 if (param.Type.IsArray || param.Type.IsDictionary)
                 {
                     if (param.HasDefaultValue)
                     {
-                        cs.AppendLine("                if (" + param.Name + " != " + FormatCSDefaultValue(param) + ")");
+                        cs.Append("                if (").Append(param.Name).Append(" != ").Append(FormatCSDefaultValue(param)).AppendLine(")");
                         cs.AppendLine("                {");
                     }
                     if (param.Type.IsDictionary)
                     {
-                        cs.AppendLine((param.HasDefaultValue ? "    " : "") + "                foreach (" + GetCSTypeName(param.Type).Replace("Dictionary", "KeyValuePair") + " _item in " + param.Name + ")");
-                        cs.AppendLine((param.HasDefaultValue ? "    " : "") + "                {");
-                        cs.AppendLine((param.HasDefaultValue ? "    " : "") + "                    values.Add(\"" + param.Name + "_\" + _item.Key, _item.Value);");
-                        cs.AppendLine((param.HasDefaultValue ? "    " : "") + "                }");
+                        cs.Append((param.HasDefaultValue ? "    " : "")).Append("                foreach (").Append(GetCSTypeName(param.Type).Replace("Dictionary", "KeyValuePair")).Append(" _item in ").Append(param.Name).AppendLine(")");
+                        cs.Append((param.HasDefaultValue ? "    " : "")).AppendLine("                {");
+                        cs.Append((param.HasDefaultValue ? "    " : "")).Append("                    values.Add(\"").Append(param.Name).AppendLine("_\" + _item.Key, _item.Value);");
+                        cs.Append((param.HasDefaultValue ? "    " : "")).AppendLine("                }");
                     }
                     else
                     {
-                        cs.AppendLine((param.HasDefaultValue ? "    " : "") + "                foreach (" + GetCSTypeName(param.Type).Replace("[]", string.Empty) + " _item in " + param.Name + ")");
-                        cs.AppendLine((param.HasDefaultValue ? "    " : "") + "                {");
-                        cs.AppendLine((param.HasDefaultValue ? "    " : "") + "                    values.Add(\"" + param.Name + "\", _item" + (param.Type.TypeName == "String" ? ".ToString()" : "") + ");");
-                        cs.AppendLine((param.HasDefaultValue ? "    " : "") + "                }");
+                        cs.Append((param.HasDefaultValue ? "    " : "")).Append("                foreach (").Append(GetCSTypeName(param.Type).Replace("[]", string.Empty)).Append(" _item in ").Append(param.Name).AppendLine(")");
+                        cs.Append((param.HasDefaultValue ? "    " : "")).AppendLine("                {");
+                        cs.Append((param.HasDefaultValue ? "    " : "")).Append("                    values.Add(\"").Append(param.Name).Append("\", _item").Append((param.Type.TypeName != "String" ? ".ToString()" : string.Empty)).AppendLine(");");
+                        cs.Append((param.HasDefaultValue ? "    " : "")).AppendLine("                }");
                     }
                     if (param.HasDefaultValue)
                     {
@@ -849,16 +796,16 @@ public static string ApiUtilitiesCodeBlock2 =
                 }
                 else
                 {
-                    cs.AppendLine("                " + (param.HasDefaultValue ? "if (" + param.Name + " != " + FormatCSDefaultValue(param) + ") " : "") + "values.Add(\"" + param.Name + "\", " + (param.Type.IsList && (param.Type.IsPrimitive || param.Type.IsEnum) ? "string.Join(\",\", " + cspar + ")" : cspar) + ");");
+                    cs.Append("                ").Append((param.HasDefaultValue ? "if (" + param.Name + " != " + FormatCSDefaultValue(param) + ") " : "")).Append("values.Add(\"").Append(param.Name).Append("\", ").Append((param.Type.IsList && (param.Type.IsPrimitive || param.Type.IsEnum) ? "string.Join(\",\", " + cspar + ")" : cspar)).AppendLine(");");
                 }
 
                 return cs.ToString();
             }
 
-            public static string ChooseUploadMethod(APIDocParser.Function func, KeyValuePair<string, APIDocParser.Category> cat, out bool uploadMethosIsPostAsync)
+            public static string ChooseUploadMethod(APIDocParser.Function func, KeyValuePair<string, APIDocParser.Category> cat)
             {
                 StringBuilder cs = new StringBuilder();
-                uploadMethosIsPostAsync = false;
+
                 if (func.Parameters.Any(f => f.IsFilePostUpload == true))
                 {
                     var subParam = func.Parameters.First(f => f.IsFilePostUpload);
@@ -869,49 +816,15 @@ public static string ApiUtilitiesCodeBlock2 =
                         filesLineToAppend += "new List<ApiTypes.FileData>() { " + subParam.Name + " }";
                     else
                         filesLineToAppend += subParam.Name + ".ToList()";
-                    if (netstandardCompatible)
-                    {
-                        cs.AppendLine("                byte[] apiResponse = await ApiUtilities.HttpPostFileAsync(\"/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "\", " + filesLineToAppend + ", values);");
-                    }
-                    else
-                    {
-                        cs.AppendLine("                byte[] apiResponse = ApiUtilities.HttpPostFile(Api.ApiUri + \"/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "\", " + filesLineToAppend + ", values);");
-                    }
+
+                    cs.Append("                byte[] apiResponse = ApiUtilities.HttpPostFile(Api.ApiUri + \"/").Append(cat.Value.UriPath.ToLower()).Append("/").Append(func.Name.ToLower()).Append("\", ").Append(filesLineToAppend).AppendLine(", values);");
                 }
                 else if (func.Parameters.Any(f => f.IsFilePutUpload == true))
-                {
-                    if (netstandardCompatible)
-                    {
-                        cs.AppendLine("                byte[] apiResponse = await ApiUtilities.HttpPutFileAsync(\"/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "\", " + func.Parameters.First(f => f.IsFilePutUpload).Name + ", values);");
-                    }
-                    else
-                    {
-                        cs.AppendLine("                byte[] apiResponse = ApiUtilities.HttpPutFile(Api.ApiUri + \"/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "\", " + func.Parameters.First(f => f.IsFilePutUpload).Name + ", values);");
-                    }
-                }
+                    cs.Append("                byte[] apiResponse = ApiUtilities.HttpPutFile(Api.ApiUri + \"/").Append(cat.Value.UriPath.ToLower()).Append("/").Append(func.Name.ToLower()).Append("\", ").Append(func.Parameters.First(f => f.IsFilePutUpload).Name).AppendLine(", values);");
                 else if (func.ReturnType.IsFile)
-                {
-                    if (netstandardCompatible)
-                    {
-                        cs.AppendLine("                return await ApiUtilities.HttpGetFileAsync(\"/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "\", values);");
-                    }
-                    else
-                    {
-                        cs.AppendLine("                return ApiUtilities.HttpGetFile(Api.ApiUri + \"/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "\", values);");
-                    }
-                }
+                    cs.Append("                return ApiUtilities.HttpGetFile(Api.ApiUri + \"/").Append(cat.Value.UriPath.ToLower()).Append("/").Append(func.Name.ToLower()).AppendLine("\", values);");
                 else
-                {
-                    if (netstandardCompatible)
-                    {
-                        uploadMethosIsPostAsync = true;
-                        cs.AppendLine("                ApiResponse<" + GetCSTypeName(func.ReturnType, "VoidApiResponse") + "> apiResponse = await ApiUtilities.PostAsync<" + GetCSTypeName(func.ReturnType, "VoidApiResponse") + ">(\"/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "\", values);");
-                    }
-                    else
-                    {
-                        cs.AppendLine("                byte[] apiResponse = client.UploadValues(Api.ApiUri + \"/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "\", values);");
-                    }
-                }
+                    cs.Append("                byte[] apiResponse = client.UploadValues(Api.ApiUri + \"/").Append(cat.Value.UriPath.ToLower()).Append("/").Append(func.Name.ToLower()).AppendLine("\", values);");
 
                 return cs.ToString();
             }
@@ -921,25 +834,90 @@ public static string ApiUtilitiesCodeBlock2 =
                 StringBuilder cs = new StringBuilder();
 
                 cs.AppendLine("    /// <summary>");
-                cs.AppendLine("    /// " + cls.Summary);
+                cs.Append("    /// ").AppendLine(cls.Summary);
                 cs.AppendLine("    /// </summary>");
-                cs.AppendLine("    public " + (cls.IsEnum ? "enum " : "class ") + cls.Name);
+                cs.Append("    public ").Append((cls.IsEnum ? "enum " : "class ")).AppendLine(cls.Name);
                 cs.AppendLine("    {");
                 foreach (var fld in cls.Fields)
                 {
                     cs.AppendLine("        /// <summary>");
-                    cs.AppendLine("        /// " + fld.Description);
+                    cs.Append("        /// ").AppendLine(fld.Description);
                     cs.AppendLine("        /// </summary>");
                     if (cls.IsEnum)
-                        cs.AppendLine("        " + fld.Name + " = " + ((APIDocParser.EnumField)fld).Value + ",");
+                        cs.Append("        ").Append(fld.Name).Append(" = ").Append(((APIDocParser.EnumField)fld).Value).AppendLine(",");
                     else
-                        cs.AppendLine("        public " + GetCSTypeName(fld.Type) + " " + fld.Name + " {get; set;}");
+                        cs.Append("        public ").Append(GetCSTypeName(fld.Type)).Append(" ").Append(fld.Name).AppendLine(";");
                     cs.AppendLine();
                 }
                 cs.AppendLine("    }");
                 cs.AppendLine();
 
                 return cs.ToString();
+            }
+
+            public static string BuildCodeSampleForMethod(APIDocParser.Function func, KeyValuePair<string, APIDocParser.Category> cat)
+            {
+                var replaceTags = new System.Collections.Specialized.StringDictionary();
+
+                replaceTags.Add(Environment.NewLine, "</br>");
+                replaceTags.Add(">", "&gt;");
+                replaceTags.Add("<", "&lt;");
+
+                StringBuilder cs = new StringBuilder();
+                bool parametersToWrite = func.Parameters.Any(o => o.Name != "apikey" && !o.HasDefaultValue);
+
+                // generate parameters definitions
+                if (parametersToWrite)
+                {
+                    foreach (var param in func.Parameters)
+                    {
+                        if (param.Name == "apikey" || param.HasDefaultValue)
+                            continue;
+
+                        cs.Append(GetCSTypeName(param.Type, forParam: true)).Append(" ").Append(param.Name);
+                        cs.Append(" = ").Append(param.Type.DefaultValue /*FormatCSDefaultValue(param, true)*/).AppendLine(";");
+                    }
+                }
+                if (parametersToWrite) cs.AppendLine();
+
+                // create return object, if exists
+                if (func.ReturnType.TypeName != null)
+                    cs.Append(GetCSTypeName(func.ReturnType)).Append(" result = ").Append((func.ReturnType.IsEnum ? "ApiTypes." + func.ReturnType.TypeName + "." : string.Empty)).Append(func.ReturnType.DefaultValue).AppendLine(";");
+
+                cs.Append(
+@"try
+{
+    ");
+                if (func.ReturnType.TypeName != null) cs.Append("result = ");
+
+                // generate method call
+                cs.Append(cat.Key).Append(".").Append(func.Name).Append("(");
+
+                if (parametersToWrite)
+                {
+                    foreach (var param in func.Parameters)
+                    {
+                        if (param.Name == "apikey" || param.HasDefaultValue) continue;
+                        cs.Append(param.Name).Append(": ").Append(param.Name).Append(", ");  // TODO This makes Email/Send call empty. Should we make a special case?
+                    }
+
+                    cs.Remove(cs.Length - 2, 2);
+                }
+
+                cs.AppendLine(");");
+                cs.Append(
+@"}
+catch (Exception ex)
+{
+    if (ex is ApplicationException)
+        Console.WriteLine(""Server didn't accept the request: "" + ex.Message);
+    else
+        Console.WriteLine(""Something unexpected happened: "" + ex.Message);
+
+    return;
+}");
+
+                return cs.ToString().LimitLength(1000).MultipleReplaceIgnoreCase(replaceTags);
             }
 
             #endregion

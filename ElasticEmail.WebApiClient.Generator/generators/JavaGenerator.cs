@@ -7,7 +7,7 @@ using System.Web;
 using ICSharpCode.SharpZipLib.Zip;
 using ElasticEmail.WebApiClient.Generator;
 
-namespace ElasticEmail.generators
+namespace ElasticEmail
 {
     public static partial class APIDoc
     {
@@ -44,7 +44,8 @@ namespace ElasticEmail.generators
                 { "XmlResponse", "String" },
                 { "HtmlResponse", "String" },
                 { "JavascriptResponse", "String" },
-                { "JsonResponse", "String" }
+                { "JsonResponse", "String" },
+                { "int", "Integer" }
             };
 
             static HashSet<string> classesReturnedAsList = new HashSet<string>();
@@ -64,15 +65,13 @@ namespace ElasticEmail.generators
                 string typeName = dataType.TypeName;
                 if (dataType.IsDictionary)
                 {
-                    string[] subtypes = typeName.Split(',');
-                    for (int i = 0; i < 2; i++)
-                    {
-                        var tmpName = subtypes[i];
-                        bool wasFound = paramJavaTypeToHashMap.TryGetValue(tmpName, out subtypes[i]);
-                        if (!wasFound) subtypes[i] = tmpName;
-                    }
-                    // subtypes.ForEach((f) => { paramCLRTypeToJava.TryGetValue(f, out f); });
-                    typeName = "HashMap<" + subtypes[0] + ", " + subtypes[1] + ">";
+                    string subOut1 = string.Empty;
+                    string subOut2 = string.Empty;
+                    string subType1 = GetJavaTypeName(dataType.SubTypes[0]);
+                    string subType2 = GetJavaTypeName(dataType.SubTypes[1]);
+                    if (paramJavaTypeToHashMap.TryGetValue(subType1, out subOut1) == false) subOut1 = subType1;
+                    if (paramJavaTypeToHashMap.TryGetValue(subType2, out subOut2) == false) subOut2 = subType2;
+                    typeName = "HashMap<" + subOut1 + ", " + subOut2 + ">";
                     return typeName;
                 }
                 if (dataType.IsPrimitive)
@@ -93,7 +92,12 @@ namespace ElasticEmail.generators
                         return typeName + "Array";
                     }
                 }
-                if (dataType.IsList) typeName = (forParam ? "Iterable" : "ArrayList") + "<" + (typeName == "int" ? "Integer" : typeName) + ">";
+                if (dataType.IsList)
+                {
+                    string listName = null;
+                    paramJavaTypeToHashMap.TryGetValue(typeName, out listName);
+                    typeName = (forParam ? "Iterable" : "ArrayList") + "<" + (listName ?? typeName) + ">";
+                }
                 else if (dataType.IsArray) typeName += "[]";
                 //else if (dataType.IsDictionary) typeName = "HashMap<" + typeName + ">";//typeName.Replace("Dictionary", "HashMap");// "HashMap<String, String>";
                 //if (dataType.IsNullable && forParam && typeName == "String") typeName = "@Nullable " + typeName;
@@ -111,7 +115,7 @@ namespace ElasticEmail.generators
 
                     string def = param.DefaultValue;
                     def = def.ToLowerInvariant();
-                    if (param.Type.TypeName == "String") def = "\"" + def + "\"";
+                    if (param.Type.TypeName.Equals("String", StringComparison.OrdinalIgnoreCase)) def = "\"" + def + "\"";
                     return def;
                 }
 
@@ -139,6 +143,7 @@ import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
 import javax.net.ssl.HttpsURLConnection;
+
 
 public class API {
 	
@@ -177,6 +182,7 @@ public class API {
             String formdataTemplate = ""Content-Disposition: form-data; name=\""%s\""\r\n\r\n%s"";
             for (String key : values.keySet())
             {
+            	if (values.get(key) == null) continue;
                 wr.write(boundarybytes, 0, boundarybytes.length);
                 String formitem = String.format(formdataTemplate, key, values.get(key));
                 byte[] formitembytes = formitem.getBytes(Charset.forName(""UTF8""));
@@ -320,8 +326,7 @@ public class API {
 		
 		return sb.toString();
 	}
-
-    protected <T> String joinList(Iterable<T> list){
+	protected <T> String joinList(Iterable<T> list){
 		StringBuilder sb = new StringBuilder();
 		
 		for (T item : list){
@@ -495,15 +500,19 @@ import com.elasticemail.app.APIResponse.VoidApiResponse;
                             if ((param.Type.IsNullable && paramTypeName == "Date") || param.Type.IsList)
                                 java.Append("if (" + param.Name + " != null) ");
 
-                            java.Append("values.put(\"" + param.Name + "\", ");
-
+                            if (param.Type.IsDictionary == false)
+                                java.Append("values.put(\"" + param.Name + "\", ");
 
                             if (paramTypeName == "String")
                                 java.Append(param.Name);
                             else if (param.Type.IsList)
                                 java.Append("joinList(" + param.Name + ")");
-                            else
+                            else if (param.Type.IsDictionary == false)
                                 java.Append("String.valueOf(" + param.Name + ")");
+                            else
+                                java.Append(@"
+           for (String key : " + param.Name + @".keySet())
+              values.put(""" + param.Name + "_\" + key, " + (param.Name == "headers" ? "key + \": \" + " : string.Empty) + param.Name + ".get(key)"); // special case for 'headers' - needs change if parameter's name is modified!
 
                             java.AppendLine(");");
                         }
@@ -589,16 +598,25 @@ public class ApiTypes {");
                 zipStream.Close();          // Must finish the ZipOutputStream before using outputMemStream.
                 return mainZipStream;
             }
-        }
 
-        public static void PutFileIn(string filename, string stringContent, ZipOutputStream outputStream)
-        {
-            MemoryStream Content = new MemoryStream(Encoding.UTF8.GetBytes(stringContent));
-            ZipEntry newEntry = new ZipEntry(filename) { DateTime = DateTime.UtcNow };
-            outputStream.PutNextEntry(newEntry);
-            Content.CopyTo(outputStream);
+            public static void PutFileIn(string filename, string stringContent, ZipOutputStream outputStream)
+            {
+                MemoryStream Content = new MemoryStream(Encoding.UTF8.GetBytes(stringContent));
+                ZipEntry newEntry = new ZipEntry(filename) { DateTime = DateTime.UtcNow };
+                outputStream.PutNextEntry(newEntry);
+                Content.CopyTo(outputStream);
 
-            outputStream.CloseEntry();
+                outputStream.CloseEntry();
+            }
+
+            public static string BuildCodeSampleForMethod(APIDocParser.Function func, KeyValuePair<string, APIDocParser.Category> cat)
+            {
+                StringBuilder java = new StringBuilder();
+
+                java.Append("Hello world");
+
+                return java.ToString();
+            }
         }
     }
 }

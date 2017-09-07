@@ -12,6 +12,7 @@ namespace ElasticEmail
             public string Name { get; set; }
             public string Summary { get; set; }
             public DataType ReturnType { get; set; }
+            public string ReturnTypeInfo { get; set; }
             public List<Parameter> Parameters = new List<Parameter>();
             public string Example { get; set; }
         }

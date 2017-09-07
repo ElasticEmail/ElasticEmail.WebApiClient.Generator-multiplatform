@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Web;
 
-namespace ElasticEmail.generators
+namespace ElasticEmail
 {
     public static partial class APIDoc
     {
@@ -87,7 +87,7 @@ namespace ElasticEmail.generators
 
                     string def = param.DefaultValue;
                     def = def.ToLowerInvariant();
-                    if (param.Type.TypeName == "String") def = "\"" + def + "\"";
+                    if (param.Type.TypeName.Equals("String", StringComparison.OrdinalIgnoreCase)) def = "\"" + def + "\"";
                     return def;
                 }
 
@@ -125,6 +125,7 @@ ApiLicenseSupplier.ApiLicense
 namespace ElasticEmailClient;
 use ApiTypes;
 
+
 class ApiClient 
 {
     private static $apiKey = ""00000000-0000-0000-0000-000000000000"";
@@ -145,17 +146,25 @@ class ApiClient
 
         if ($method === ""POST"" && count($attachments) > 0) {
             foreach ($attachments as $k => $attachment) {
-                $data['file_'. $k] = self::attachFile($attachment);
+				$att = self::attachFile($attachment);
+				$postnameSplit = explode('/', $att->postname);
+				$att->postname = trim(end($postnameSplit));
+                $data['file_'. $k] = $att;
             }
         }
 
         if ($method === ""POST"") 
         {
             curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
+			if (empty($attachments)) {
+				curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($data));
+			} else {
+				error_reporting(E_ALL ^ E_NOTICE);
+				curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
+			}
         }
 
-        $response = curl_exec($ch);
+        $response = self::executeWithRetry($ch, true);
         if ($response === false) 
         {
             throw new ApiException($url, $method, 'Request Error: ' . curl_error($ch));
@@ -172,7 +181,7 @@ class ApiClient
             throw new ApiException($url, $method, $jsonResult->error);
         }
 
-        return $jsonResult->data;
+        return (isset($jsonResult->data)? $jsonResult->data : null);
     }" +
     /*
     ALTERNATIVE:
@@ -190,6 +199,35 @@ class ApiClient
         return $jsonResult['data'];    
 */
     @"
+
+    public static function executeWithRetry($ch, $sleep = false)
+    {		
+        $counter = 0;
+        $maxRetries = 3;
+        $lastErr = null;
+        $sleepInSeconds = 5;
+
+        while ($counter < $maxRetries)
+        {
+            try
+            {
+                $response = curl_exec($ch);
+                return $response;
+            }
+            catch (\Exception $e)
+            {
+                $counter++;
+                $lastErr = $e->getMessage();
+				
+                if ($sleep) 
+                {
+                    sleep($sleepInSeconds);
+                }
+            }
+        }
+		
+        throw new \Exception('Error after '.$maxRetries.' retries: '.$lastErr);		
+    }
 
     public static function getFile($target, $data) 
     {
@@ -327,51 +365,115 @@ class ApiException extends \Exception
 
                         php.Append(")");
                         php.AppendLine(" {");
-                        php.Append("        return ApiClient::");
-
-                        if (!func.ReturnType.IsFile)
-                            php.Append("Request(");
-                        else
-                            php.Append("getFile(");
-
-                        php.Append("'" + cat.Value.Name.ToLower() + "/" + func.Name.ToLower() + "'");
-                        bool hasParamsNotFiles = false;
-                        if (func.Parameters.Any(f => !f.IsFilePutUpload && !f.IsFilePostUpload && f.Name != "apikey"))
+                        if (func.Parameters.Any(f => f.Type.IsDictionary))
                         {
-                            hasParamsNotFiles = true;
-                            php.AppendLine(", array(");
-                            for (int i = 0; i < func.Parameters.Count; i++)
+                            php.Append("        $arr = array(");
+                            bool hasParamsNotFiles = false;
+                            bool pastFirstParam = false;
+                            if (func.Parameters.Any(f => !f.IsFilePutUpload && !f.IsFilePostUpload && f.Name != "apikey"))
                             {
-                                APIDocParser.Parameter param = func.Parameters[i];
-                                if (param.Name == "apikey" || param.IsFilePostUpload || param.IsFilePutUpload)
-                                    continue;
-
-                                php.Append("                    ");
-
-                                php.Append("'" + param.Name + "' => ");
-                                if (param.Type.IsArray || param.Type.IsList)
+                                hasParamsNotFiles = true;
+                                for (int i = 0; i < func.Parameters.Count; i++)
                                 {
-                                    php.Append("(count($" + param.Name + ") === 0) ? null : join(';', $" + param.Name + ")");
+                                    APIDocParser.Parameter param = func.Parameters[i];
+                                    if (param.Name == "apikey" || param.IsFilePostUpload || param.IsFilePutUpload || param.Type.IsDictionary)
+                                        continue;
+
+                                    if (pastFirstParam)
+                                        php.Append("                    ");
+                                    else pastFirstParam = true;
+
+                                    php.Append("'" + param.Name + "' => ");
+                                    if (param.Type.IsArray || param.Type.IsList)
+                                    {
+                                        php.Append("(count($" + param.Name + ") === 0) ? null : join(';', $" + param.Name + ")");
+                                    }
+                                    else
+                                        php.Append("$" + param.Name);
+
+
+                                    if (i <= func.Parameters.Count - 2) php.AppendLine(",");
                                 }
-                                else
-                                    php.Append("$" + param.Name);
-
-
-                                if (i <= func.Parameters.Count - 2) php.AppendLine(",");
                             }
-                            php.Append("\r\n        )");
-                        }
+                            php.AppendLine("        );");
+                            foreach (var dictionaryParam in func.Parameters.Where(o => o.Type.IsDictionary))
+                            {
+                                // special case for 'headers' - needs change if parameter's name is modified!
+                                php.AppendLine(
+@"        foreach(array_keys($" + dictionaryParam.Name + @") as $key) {
+            $arr['" + dictionaryParam.Name + "_'.$key] = " + (dictionaryParam.Name == "headers" ? "$key.': '." : string.Empty) + "$" + dictionaryParam.Name + @"[$key]; 
+        }");
+                            }
+                            php.Append("        return ApiClient::");
+                            if (!func.ReturnType.IsFile)
+                                php.Append("Request(");
+                            else
+                                php.Append("getFile(");
+                            php.Append("'" + cat.Value.Name.ToLower() + "/" + func.Name.ToLower() + "'");
 
-                        //POST
-                        if (func.Parameters.Any(f => f.IsFilePostUpload || f.IsFilePutUpload))
+                            //POST
+                            if (func.Parameters.Any(f => f.IsFilePostUpload || f.IsFilePutUpload))
+                            {
+                                php.Append(", ");
+                                if (!hasParamsNotFiles)
+                                    php.Append("array(), ");
+                                else
+                                    php.Append("$arr, ");
+                                php.Append("\"POST\", $" + func.Parameters.First(f => f.IsFilePostUpload).Name);
+                            }
+                            else
+                                php.Append(", $arr");
+
+                            php.AppendLine(");");
+                        }
+                        else
                         {
-                            php.Append(", ");
-                            if (!hasParamsNotFiles)
-                                php.Append("array(), ");
-                            php.Append("\"POST\", $" + func.Parameters.First(f => f.IsFilePostUpload).Name);
-                        }
+                            php.Append("        return ApiClient::");
 
-                        php.AppendLine(");");
+                            if (!func.ReturnType.IsFile)
+                                php.Append("Request(");
+                            else
+                                php.Append("getFile(");
+
+                            php.Append("'" + cat.Value.Name.ToLower() + "/" + func.Name.ToLower() + "'");
+                            bool hasParamsNotFiles = false;
+                            if (func.Parameters.Any(f => !f.IsFilePutUpload && !f.IsFilePostUpload && f.Name != "apikey"))
+                            {
+                                hasParamsNotFiles = true;
+                                php.AppendLine(", array(");
+                                for (int i = 0; i < func.Parameters.Count; i++)
+                                {
+                                    APIDocParser.Parameter param = func.Parameters[i];
+                                    if (param.Name == "apikey" || param.IsFilePostUpload || param.IsFilePutUpload)
+                                        continue;
+
+                                    php.Append("                    ");
+
+                                    php.Append("'" + param.Name + "' => ");
+                                    if (param.Type.IsArray || param.Type.IsList)
+                                    {
+                                        php.Append("(count($" + param.Name + ") === 0) ? null : join(';', $" + param.Name + ")");
+                                    }
+                                    else
+                                        php.Append("$" + param.Name);
+
+
+                                    if (i <= func.Parameters.Count - 2) php.AppendLine(",");
+                                }
+                                php.Append("\r\n        )");
+                            }
+
+                            //POST
+                            if (func.Parameters.Any(f => f.IsFilePostUpload || f.IsFilePutUpload))
+                            {
+                                php.Append(", ");
+                                if (!hasParamsNotFiles)
+                                    php.Append("array(), ");
+                                php.Append("\"POST\", $" + func.Parameters.First(f => f.IsFilePostUpload).Name);
+                            }
+
+                            php.AppendLine(");");
+                        }
 
                         php.AppendLine("    }");
                         php.AppendLine();
@@ -412,6 +514,15 @@ class ApiException extends \Exception
                     php.AppendLine("}");
                     php.AppendLine();
                 }
+
+                return php.ToString();
+            }
+
+            public static string BuildCodeSampleForMethod(APIDocParser.Function func, KeyValuePair<string, APIDocParser.Category> cat)
+            {
+                StringBuilder php = new StringBuilder();
+
+                php.Append("Hello world");
 
                 return php.ToString();
             }
