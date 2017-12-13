@@ -534,6 +534,419 @@ using System.Threading.Tasks;";
 ";
             #endregion ApiUtilitiesCodeNetStandard
 
+            #region MimeHelper
+            public static string MimeHelper =
+    @"
+   #region MIME HELPER
+    internal class MimeMapping
+    {
+        private static Dictionary<string, string> mimeMappings = null;
+        private static object locker = new object();
+        private static readonly char[] _pathSeparatorChars = new char[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar, Path.VolumeSeparatorChar }; // from Path.GetFileName()
+
+        public static string GetMimeMapping(string fileName)
+        {
+            if (fileName == null)
+            {
+                throw new ArgumentNullException(""fileName"");
+            }
+            EnsureMapping();
+        fileName = GetFileName(fileName); // strip off path separators
+
+            // some MIME types have complex extensions (like "".exe.config""), so we need to work left-to-right
+            for (int i = 0; i<fileName.Length; i++)
+            {
+                if (fileName[i] == '.')
+                {
+                    // potential extension - consult dictionary
+                    string mimeType;
+                    if (mimeMappings.TryGetValue(fileName.Substring(i), out mimeType))
+                    {
+                        // found!
+                        return mimeType;
+                    }
+}
+            }
+
+            // If we reached this point, either we couldn't find an extension, or the extension we found
+            // wasn't recognized. In either case, the "".*"" mapping is guaranteed to exist as a fallback.
+            return mimeMappings["".*""];
+        }
+        private static string GetFileName(string path)
+{
+    int pathSeparatorIndex = path.LastIndexOfAny(_pathSeparatorChars);
+    return (pathSeparatorIndex >= 0) ? path.Substring(pathSeparatorIndex) : path;
+}
+private static void EnsureMapping()
+{
+    // Ensure initialized only once
+    if (mimeMappings == null)
+    {
+        lock (locker)
+        {
+            if (mimeMappings == null)
+            {
+                PopulateMappings();
+            }
+        }
+    }
+}
+private static void PopulateMappings()
+{
+    mimeMappings = new Dictionary<string, string>()
+            {
+            { "".*"", ""application/octet-stream"" },
+            {"".323"", ""text/h323""},
+            {"".aaf"", ""application/octet-stream""},
+            {"".aca"", ""application/octet-stream""},
+            {"".accdb"", ""application/msaccess""},
+            {"".accde"", ""application/msaccess""},
+            {"".accdt"", ""application/msaccess""},
+            {"".acx"", ""application/internet-property-stream""},
+            {"".afm"", ""application/octet-stream""},
+            {"".ai"", ""application/postscript""},
+            {"".aif"", ""audio/x-aiff""},
+            {"".aifc"", ""audio/aiff""},
+            {"".aiff"", ""audio/aiff""},
+            {"".application"", ""application/x-ms-application""},
+            {"".art"", ""image/x-jg""},
+            {"".asd"", ""application/octet-stream""},
+            {"".asf"", ""video/x-ms-asf""},
+            {"".asi"", ""application/octet-stream""},
+            {"".asm"", ""text/plain""},
+            {"".asr"", ""video/x-ms-asf""},
+            {"".asx"", ""video/x-ms-asf""},
+            {"".atom"", ""application/atom+xml""},
+            {"".au"", ""audio/basic""},
+            {"".avi"", ""video/x-msvideo""},
+            {"".axs"", ""application/olescript""},
+            {"".bas"", ""text/plain""},
+            {"".bcpio"", ""application/x-bcpio""},
+            {"".bin"", ""application/octet-stream""},
+            {"".bmp"", ""image/bmp""},
+            {"".c"", ""text/plain""},
+            {"".cab"", ""application/octet-stream""},
+            {"".calx"", ""application/vnd.ms-office.calx""},
+            {"".cat"", ""application/vnd.ms-pki.seccat""},
+            {"".cdf"", ""application/x-cdf""},
+            {"".chm"", ""application/octet-stream""},
+            {"".class"", ""application/x-java-applet""},
+            {"".clp"", ""application/x-msclip""},
+            {"".cmx"", ""image/x-cmx""},
+            {"".cnf"", ""text/plain""},
+            {"".cod"", ""image/cis-cod""},
+            {"".cpio"", ""application/x-cpio""},
+            {"".cpp"", ""text/plain""},
+            {"".crd"", ""application/x-mscardfile""},
+            {"".crl"", ""application/pkix-crl""},
+            {"".crt"", ""application/x-x509-ca-cert""},
+            {"".csh"", ""application/x-csh""},
+            {"".css"", ""text/css""},
+            {"".csv"", ""application/octet-stream""},
+            {"".cur"", ""application/octet-stream""},
+            {"".dcr"", ""application/x-director""},
+            {"".deploy"", ""application/octet-stream""},
+            {"".der"", ""application/x-x509-ca-cert""},
+            {"".dib"", ""image/bmp""},
+            {"".dir"", ""application/x-director""},
+            {"".disco"", ""text/xml""},
+            {"".dll"", ""application/x-msdownload""},
+            {"".dll.config"", ""text/xml""},
+            {"".dlm"", ""text/dlm""},
+            {"".doc"", ""application/msword""},
+            {"".docm"", ""application/vnd.ms-word.document.macroEnabled.12""},
+            {"".docx"", ""application/vnd.openxmlformats-officedocument.wordprocessingml.document""},
+            {"".dot"", ""application/msword""},
+            {"".dotm"", ""application/vnd.ms-word.template.macroEnabled.12""},
+            {"".dotx"", ""application/vnd.openxmlformats-officedocument.wordprocessingml.template""},
+            {"".dsp"", ""application/octet-stream""},
+            {"".dtd"", ""text/xml""},
+            {"".dvi"", ""application/x-dvi""},
+            {"".dwf"", ""drawing/x-dwf""},
+            {"".dwp"", ""application/octet-stream""},
+            {"".dxr"", ""application/x-director""},
+            {"".eml"", ""message/rfc822""},
+            {"".emz"", ""application/octet-stream""},
+            {"".eot"", ""application/octet-stream""},
+            {"".eps"", ""application/postscript""},
+            {"".etx"", ""text/x-setext""},
+            {"".evy"", ""application/envoy""},
+            {"".exe"", ""application/octet-stream""},
+            {"".exe.config"", ""text/xml""},
+            {"".fdf"", ""application/vnd.fdf""},
+            {"".fif"", ""application/fractals""},
+            {"".fla"", ""application/octet-stream""},
+            {"".flr"", ""x-world/x-vrml""},
+            {"".flv"", ""video/x-flv""},
+            {"".gif"", ""image/gif""},
+            {"".gtar"", ""application/x-gtar""},
+            {"".gz"", ""application/x-gzip""},
+            {"".h"", ""text/plain""},
+            {"".hdf"", ""application/x-hdf""},
+            {"".hdml"", ""text/x-hdml""},
+            {"".hhc"", ""application/x-oleobject""},
+            {"".hhk"", ""application/octet-stream""},
+            {"".hhp"", ""application/octet-stream""},
+            {"".hlp"", ""application/winhlp""},
+            {"".hqx"", ""application/mac-binhex40""},
+            {"".hta"", ""application/hta""},
+            {"".htc"", ""text/x-component""},
+            {"".htm"", ""text/html""},
+            {"".html"", ""text/html""},
+            {"".htt"", ""text/webviewhtml""},
+            {"".hxt"", ""text/html""},
+            {"".ico"", ""image/x-icon""},
+            {"".ics"", ""application/octet-stream""},
+            {"".ief"", ""image/ief""},
+            {"".iii"", ""application/x-iphone""},
+            {"".inf"", ""application/octet-stream""},
+            {"".ins"", ""application/x-internet-signup""},
+            {"".isp"", ""application/x-internet-signup""},
+            {"".IVF"", ""video/x-ivf""},
+            {"".jar"", ""application/java-archive""},
+            {"".java"", ""application/octet-stream""},
+            {"".jck"", ""application/liquidmotion""},
+            {"".jcz"", ""application/liquidmotion""},
+            {"".jfif"", ""image/pjpeg""},
+            {"".jpb"", ""application/octet-stream""},
+            {"".jpe"", ""image/jpeg""},
+            {"".jpeg"", ""image/jpeg""},
+            {"".jpg"", ""image/jpeg""},
+            {"".js"", ""application/x-javascript""},
+            {"".jsx"", ""text/jscript""},
+            {"".latex"", ""application/x-latex""},
+            {"".lit"", ""application/x-ms-reader""},
+            {"".lpk"", ""application/octet-stream""},
+            {"".lsf"", ""video/x-la-asf""},
+            {"".lsx"", ""video/x-la-asf""},
+            {"".lzh"", ""application/octet-stream""},
+            {"".m13"", ""application/x-msmediaview""},
+            {"".m14"", ""application/x-msmediaview""},
+            {"".m1v"", ""video/mpeg""},
+            {"".m3u"", ""audio/x-mpegurl""},
+            {"".man"", ""application/x-troff-man""},
+            {"".manifest"", ""application/x-ms-manifest""},
+            {"".map"", ""text/plain""},
+            {"".mdb"", ""application/x-msaccess""},
+            {"".mdp"", ""application/octet-stream""},
+            {"".me"", ""application/x-troff-me""},
+            {"".mht"", ""message/rfc822""},
+            {"".mhtml"", ""message/rfc822""},
+            {"".mid"", ""audio/mid""},
+            {"".midi"", ""audio/mid""},
+            {"".mix"", ""application/octet-stream""},
+            {"".mmf"", ""application/x-smaf""},
+            {"".mno"", ""text/xml""},
+            {"".mny"", ""application/x-msmoney""},
+            {"".mov"", ""video/quicktime""},
+            {"".movie"", ""video/x-sgi-movie""},
+            {"".mp2"", ""video/mpeg""},
+            {"".mp3"", ""audio/mpeg""},
+            {"".mpa"", ""video/mpeg""},
+            {"".mpe"", ""video/mpeg""},
+            {"".mpeg"", ""video/mpeg""},
+            {"".mpg"", ""video/mpeg""},
+            {"".mpp"", ""application/vnd.ms-project""},
+            {"".mpv2"", ""video/mpeg""},
+            {"".ms"", ""application/x-troff-ms""},
+            {"".msi"", ""application/octet-stream""},
+            {"".mso"", ""application/octet-stream""},
+            {"".mvb"", ""application/x-msmediaview""},
+            {"".mvc"", ""application/x-miva-compiled""},
+            {"".nc"", ""application/x-netcdf""},
+            {"".nsc"", ""video/x-ms-asf""},
+            {"".nws"", ""message/rfc822""},
+            {"".ocx"", ""application/octet-stream""},
+            {"".oda"", ""application/oda""},
+            {"".odc"", ""text/x-ms-odc""},
+            {"".ods"", ""application/oleobject""},
+            {"".one"", ""application/onenote""},
+            {"".onea"", ""application/onenote""},
+            {"".onetoc"", ""application/onenote""},
+            {"".onetoc2"", ""application/onenote""},
+            {"".onetmp"", ""application/onenote""},
+            {"".onepkg"", ""application/onenote""},
+            {"".osdx"", ""application/opensearchdescription+xml""},
+            {"".p10"", ""application/pkcs10""},
+            {"".p12"", ""application/x-pkcs12""},
+            {"".p7b"", ""application/x-pkcs7-certificates""},
+            {"".p7c"", ""application/pkcs7-mime""},
+            {"".p7m"", ""application/pkcs7-mime""},
+            {"".p7r"", ""application/x-pkcs7-certreqresp""},
+            {"".p7s"", ""application/pkcs7-signature""},
+            {"".pbm"", ""image/x-portable-bitmap""},
+            {"".pcx"", ""application/octet-stream""},
+            {"".pcz"", ""application/octet-stream""},
+            {"".pdf"", ""application/pdf""},
+            {"".pfb"", ""application/octet-stream""},
+            {"".pfm"", ""application/octet-stream""},
+            {"".pfx"", ""application/x-pkcs12""},
+            {"".pgm"", ""image/x-portable-graymap""},
+            {"".pko"", ""application/vnd.ms-pki.pko""},
+            {"".pma"", ""application/x-perfmon""},
+            {"".pmc"", ""application/x-perfmon""},
+            {"".pml"", ""application/x-perfmon""},
+            {"".pmr"", ""application/x-perfmon""},
+            {"".pmw"", ""application/x-perfmon""},
+            {"".png"", ""image/png""},
+            {"".pnm"", ""image/x-portable-anymap""},
+            {"".pnz"", ""image/png""},
+            {"".pot"", ""application/vnd.ms-powerpoint""},
+            {"".potm"", ""application/vnd.ms-powerpoint.template.macroEnabled.12""},
+            {"".potx"", ""application/vnd.openxmlformats-officedocument.presentationml.template""},
+            {"".ppam"", ""application/vnd.ms-powerpoint.addin.macroEnabled.12""},
+            {"".ppm"", ""image/x-portable-pixmap""},
+            {"".pps"", ""application/vnd.ms-powerpoint""},
+            {"".ppsm"", ""application/vnd.ms-powerpoint.slideshow.macroEnabled.12""},
+            {"".ppsx"", ""application/vnd.openxmlformats-officedocument.presentationml.slideshow""},
+            {"".ppt"", ""application/vnd.ms-powerpoint""},
+            {"".pptm"", ""application/vnd.ms-powerpoint.presentation.macroEnabled.12""},
+            {"".pptx"", ""application/vnd.openxmlformats-officedocument.presentationml.presentation""},
+            {"".prf"", ""application/pics-rules""},
+            {"".prm"", ""application/octet-stream""},
+            {"".prx"", ""application/octet-stream""},
+            {"".ps"", ""application/postscript""},
+            {"".psd"", ""application/octet-stream""},
+            {"".psm"", ""application/octet-stream""},
+            {"".psp"", ""application/octet-stream""},
+            {"".pub"", ""application/x-mspublisher""},
+            {"".qt"", ""video/quicktime""},
+            {"".qtl"", ""application/x-quicktimeplayer""},
+            {"".qxd"", ""application/octet-stream""},
+            {"".ra"", ""audio/x-pn-realaudio""},
+            {"".ram"", ""audio/x-pn-realaudio""},
+            {"".rar"", ""application/octet-stream""},
+            {"".ras"", ""image/x-cmu-raster""},
+            {"".rf"", ""image/vnd.rn-realflash""},
+            {"".rgb"", ""image/x-rgb""},
+            {"".rm"", ""application/vnd.rn-realmedia""},
+            {"".rmi"", ""audio/mid""},
+            {"".roff"", ""application/x-troff""},
+            {"".rpm"", ""audio/x-pn-realaudio-plugin""},
+            {"".rtf"", ""application/rtf""},
+            {"".rtx"", ""text/richtext""},
+            {"".scd"", ""application/x-msschedule""},
+            {"".sct"", ""text/scriptlet""},
+            {"".sea"", ""application/octet-stream""},
+            {"".setpay"", ""application/set-payment-initiation""},
+            {"".setreg"", ""application/set-registration-initiation""},
+            {"".sgml"", ""text/sgml""},
+            {"".sh"", ""application/x-sh""},
+            {"".shar"", ""application/x-shar""},
+            {"".sit"", ""application/x-stuffit""},
+            {"".sldm"", ""application/vnd.ms-powerpoint.slide.macroEnabled.12""},
+            {"".sldx"", ""application/vnd.openxmlformats-officedocument.presentationml.slide""},
+            {"".smd"", ""audio/x-smd""},
+            {"".smi"", ""application/octet-stream""},
+            {"".smx"", ""audio/x-smd""},
+            {"".smz"", ""audio/x-smd""},
+            {"".snd"", ""audio/basic""},
+            {"".snp"", ""application/octet-stream""},
+            {"".spc"", ""application/x-pkcs7-certificates""},
+            {"".spl"", ""application/futuresplash""},
+            {"".src"", ""application/x-wais-source""},
+            {"".ssm"", ""application/streamingmedia""},
+            {"".sst"", ""application/vnd.ms-pki.certstore""},
+            {"".stl"", ""application/vnd.ms-pki.stl""},
+            {"".sv4cpio"", ""application/x-sv4cpio""},
+            {"".sv4crc"", ""application/x-sv4crc""},
+            {"".swf"", ""application/x-shockwave-flash""},
+            {"".t"", ""application/x-troff""},
+            {"".tar"", ""application/x-tar""},
+            {"".tcl"", ""application/x-tcl""},
+            {"".tex"", ""application/x-tex""},
+            {"".texi"", ""application/x-texinfo""},
+            {"".texinfo"", ""application/x-texinfo""},
+            {"".tgz"", ""application/x-compressed""},
+            {"".thmx"", ""application/vnd.ms-officetheme""},
+            {"".thn"", ""application/octet-stream""},
+            {"".tif"", ""image/tiff""},
+            {"".tiff"", ""image/tiff""},
+            {"".toc"", ""application/octet-stream""},
+            {"".tr"", ""application/x-troff""},
+            {"".trm"", ""application/x-msterminal""},
+            {"".tsv"", ""text/tab-separated-values""},
+            {"".ttf"", ""application/octet-stream""},
+            {"".txt"", ""text/plain""},
+            {"".u32"", ""application/octet-stream""},
+            {"".uls"", ""text/iuls""},
+            {"".ustar"", ""application/x-ustar""},
+            {"".vbs"", ""text/vbscript""},
+            {"".vcf"", ""text/x-vcard""},
+            {"".vcs"", ""text/plain""},
+            {"".vdx"", ""application/vnd.ms-visio.viewer""},
+            {"".vml"", ""text/xml""},
+            {"".vsd"", ""application/vnd.visio""},
+            {"".vss"", ""application/vnd.visio""},
+            {"".vst"", ""application/vnd.visio""},
+            {"".vsto"", ""application/x-ms-vsto""},
+            {"".vsw"", ""application/vnd.visio""},
+            {"".vsx"", ""application/vnd.visio""},
+            {"".vtx"", ""application/vnd.visio""},
+            {"".wav"", ""audio/wav""},
+            {"".wax"", ""audio/x-ms-wax""},
+            {"".wbmp"", ""image/vnd.wap.wbmp""},
+            {"".wcm"", ""application/vnd.ms-works""},
+            {"".wdb"", ""application/vnd.ms-works""},
+            {"".wks"", ""application/vnd.ms-works""},
+            {"".wm"", ""video/x-ms-wm""},
+            {"".wma"", ""audio/x-ms-wma""},
+            {"".wmd"", ""application/x-ms-wmd""},
+            {"".wmf"", ""application/x-msmetafile""},
+            {"".wml"", ""text/vnd.wap.wml""},
+            {"".wmlc"", ""application/vnd.wap.wmlc""},
+            {"".wmls"", ""text/vnd.wap.wmlscript""},
+            {"".wmlsc"", ""application/vnd.wap.wmlscriptc""},
+            {"".wmp"", ""video/x-ms-wmp""},
+            {"".wmv"", ""video/x-ms-wmv""},
+            {"".wmx"", ""video/x-ms-wmx""},
+            {"".wmz"", ""application/x-ms-wmz""},
+            {"".wps"", ""application/vnd.ms-works""},
+            {"".wri"", ""application/x-mswrite""},
+            {"".wrl"", ""x-world/x-vrml""},
+            {"".wrz"", ""x-world/x-vrml""},
+            {"".wsdl"", ""text/xml""},
+            {"".wvx"", ""video/x-ms-wvx""},
+            {"".x"", ""application/directx""},
+            {"".xaf"", ""x-world/x-vrml""},
+            {"".xaml"", ""application/xaml+xml""},
+            {"".xap"", ""application/x-silverlight-app""},
+            {"".xbap"", ""application/x-ms-xbap""},
+            {"".xbm"", ""image/x-xbitmap""},
+            {"".xdr"", ""text/plain""},
+            {"".xla"", ""application/vnd.ms-excel""},
+            {"".xlam"", ""application/vnd.ms-excel.addin.macroEnabled.12""},
+            {"".xlc"", ""application/vnd.ms-excel""},
+            {"".xlm"", ""application/vnd.ms-excel""},
+            {"".xls"", ""application/vnd.ms-excel""},
+            {"".xlsb"", ""application/vnd.ms-excel.sheet.binary.macroEnabled.12""},
+            {"".xlsm"", ""application/vnd.ms-excel.sheet.macroEnabled.12""},
+            {"".xlsx"", ""application/vnd.openxmlformats-officedocument.spreadsheetml.sheet""},
+            {"".xlt"", ""application/vnd.ms-excel""},
+            {"".xltm"", ""application/vnd.ms-excel.template.macroEnabled.12""},
+            {"".xltx"", ""application/vnd.openxmlformats-officedocument.spreadsheetml.template""},
+            {"".xlw"", ""application/vnd.ms-excel""},
+            {"".xml"", ""text/xml""},
+            {"".xof"", ""x-world/x-vrml""},
+            {"".xpm"", ""image/x-xpixmap""},
+            {"".xps"", ""application/vnd.ms-xpsdocument""},
+            {"".xsd"", ""text/xml""},
+            {"".xsf"", ""text/xml""},
+            {"".xsl"", ""text/xml""},
+            {"".xslt"", ""text/xml""},
+            {"".xsn"", ""application/octet-stream""},
+            {"".xtp"", ""application/octet-stream""},
+            {"".xwd"", ""image/x-xwindowdump""},
+            {"".z"", ""application/x-compress""},
+            {"".zip"", ""application/x-zip-compressed""},
+        };
+    }
+}
+    #endregion MIME HELPER
+
+";
+            #endregion MimeHelper
+
             public static string ApiUtilitiesCodeBlock1 =
     @"
 
@@ -612,7 +1025,7 @@ namespace ElasticEmail.WebApiClient
         {
             Content = File.ReadAllBytes(pathWithFileName);
             FileName = Path.GetFileName(pathWithFileName);
-            ContentType = System.Web.MimeMapping.GetMimeMapping(FileName);
+            ContentType = MimeMapping.GetMimeMapping(FileName);
         }
 
         /// <summary>
@@ -646,6 +1059,7 @@ namespace ElasticEmail.WebApiClient
                 {
                     cs.Append(ApiUtilitiesCodeUsingSectionNetStandard);
                     cs.Append(ApiUtilitiesCodeBlock1);
+                    cs.Append(MimeHelper);//System.Web is not present in .net core, so we have to implement it
                     cs.Append(ApiUtilitiesClassBodyNetStandard);
                     cs.Append(ApiUtilitiesCodeBlock2);
                 }
@@ -707,11 +1121,25 @@ namespace ElasticEmail.WebApiClient
                 StringBuilder cs = new StringBuilder();
 
                 cs.AppendLine("            /// <summary>");
-                cs.Append("            /// ").AppendLine(func.Summary);
+                cs.AppendLine("            /// " + func.Summary);
                 cs.AppendLine("            /// </summary>");
                 cs.AppendLine(string.Join("\r\n", func.Parameters.Select(f => "            /// <param name=\"" + f.Name + "\">" + f.Description + "</param>")));
-                if (func.ReturnType.TypeName != null) cs.Append("            /// <returns>").Append(GetCSTypeName(func.ReturnType).Replace("<", "(").Replace(">", ")")).AppendLine("</returns>");
-                cs.Append("            public static ").Append(GetCSTypeName(func.ReturnType)).Append(" ").Append(func.Name).Append("(");
+                if (func.ReturnType.TypeName != null) cs.AppendLine("            /// <returns>" + GetCSTypeName(func.ReturnType).Replace("<", "(").Replace(">", ")") + "</returns>");
+                if (netstandardCompatible)
+                {
+                    if (GetCSTypeName(func.ReturnType) == "void")
+                    {
+                        cs.Append("            public static async Task " + func.Name + "Async(");
+                    }
+                    else
+                    {
+                        cs.Append("            public static async Task<" + GetCSTypeName(func.ReturnType) + "> " + func.Name + "Async(");
+                    }
+                }
+                else
+                {
+                    cs.Append("            public static " + GetCSTypeName(func.ReturnType) + " " + func.Name + "(");
+                }
                 bool addComma = false;
                 foreach (var param in func.Parameters)
                 {
@@ -719,32 +1147,70 @@ namespace ElasticEmail.WebApiClient
                         continue;
 
                     if (addComma) cs.Append(", ");
-                    cs.Append(GetCSTypeName(param.Type, forParam: true)).Append(" ").Append(param.Name);
+                    cs.Append(GetCSTypeName(param.Type, forParam: true) + " " + param.Name);
                     if (param.HasDefaultValue)
-                        cs.Append(" = ").Append(FormatCSDefaultValue(param));
+                        cs.Append(" = " + FormatCSDefaultValue(param));
                     addComma = true;
                 }
                 cs.AppendLine(")");
                 cs.AppendLine("            {");
                 if (!func.Parameters.Any(f => f.IsFilePostUpload | f.IsFilePutUpload) && !func.ReturnType.IsFile)
-                    cs.AppendLine("                WebClient client = new CustomWebClient();");
-                cs.Append(
-@"                NameValueCollection values = new NameValueCollection();
+                {
+                    if (!netstandardCompatible)
+                    {
+                        cs.AppendLine("                WebClient client = new CustomWebClient();");
+                    }
+                }
+                if (netstandardCompatible)
+                {
+                    cs.Append(
+@"                Dictionary<string, string> values = new Dictionary<string, string>();
                 values.Add(""apikey"", Api.ApiKey);
 ");
+                }
+                else
+                {
+                    cs.Append(
+    @"                NameValueCollection values = new NameValueCollection();
+                values.Add(""apikey"", Api.ApiKey);
+");
+                }
 
                 foreach (var param in func.Parameters)
                     cs.Append(AppendParamToNVC(param));
-
-                cs.Append(ChooseUploadMethod(func, cat));
+                bool uploadMethosIsPostAsync;
+                cs.Append(ChooseUploadMethod(func, cat, out uploadMethosIsPostAsync));
                 if (!func.ReturnType.IsFile)
                 {
-                    cs.Append("                ApiResponse<").Append(GetCSTypeName(func.ReturnType, "VoidApiResponse")).Append("> apiRet = Newtonsoft.Json.JsonConvert.DeserializeObject<ApiResponse<").Append(GetCSTypeName(func.ReturnType, "VoidApiResponse")).AppendLine(">>(Encoding.UTF8.GetString(apiResponse));");
-                    cs.AppendLine("                if (!apiRet.success) throw new ApplicationException(apiRet.error);");
-
-                    if (func.ReturnType.TypeName != null)
+                    if (netstandardCompatible)
                     {
-                        cs.AppendLine("                return apiRet.Data;");
+                        if (uploadMethosIsPostAsync)
+                        {
+                            if (func.ReturnType.TypeName != null)
+                            {
+                                cs.AppendLine("                return apiResponse.Data;");
+                            }
+                        }
+                        else
+                        {
+                            cs.AppendLine("                ApiResponse<" + GetCSTypeName(func.ReturnType, "VoidApiResponse") + "> apiRet = Newtonsoft.Json.JsonConvert.DeserializeObject<ApiResponse<" + GetCSTypeName(func.ReturnType, "VoidApiResponse") + ">>(Encoding.UTF8.GetString(apiResponse));");
+                            cs.AppendLine("                if (!apiRet.success) throw new Exception(apiRet.error);");
+
+                            if (func.ReturnType.TypeName != null)
+                            {
+                                cs.AppendLine("                return apiRet.Data;");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        cs.AppendLine("                ApiResponse<" + GetCSTypeName(func.ReturnType, "VoidApiResponse") + "> apiRet = Newtonsoft.Json.JsonConvert.DeserializeObject<ApiResponse<" + GetCSTypeName(func.ReturnType, "VoidApiResponse") + ">>(Encoding.UTF8.GetString(apiResponse));");
+                        cs.AppendLine("                if (!apiRet.success) throw new ApplicationException(apiRet.error);");
+
+                        if (func.ReturnType.TypeName != null)
+                        {
+                            cs.AppendLine("                return apiRet.Data;");
+                        }
                     }
                 }
 
@@ -802,10 +1268,10 @@ namespace ElasticEmail.WebApiClient
                 return cs.ToString();
             }
 
-            public static string ChooseUploadMethod(APIDocParser.Function func, KeyValuePair<string, APIDocParser.Category> cat)
+            public static string ChooseUploadMethod(APIDocParser.Function func, KeyValuePair<string, APIDocParser.Category> cat, out bool uploadMethosIsPostAsync)
             {
                 StringBuilder cs = new StringBuilder();
-
+                uploadMethosIsPostAsync = false;
                 if (func.Parameters.Any(f => f.IsFilePostUpload == true))
                 {
                     var subParam = func.Parameters.First(f => f.IsFilePostUpload);
@@ -816,15 +1282,49 @@ namespace ElasticEmail.WebApiClient
                         filesLineToAppend += "new List<ApiTypes.FileData>() { " + subParam.Name + " }";
                     else
                         filesLineToAppend += subParam.Name + ".ToList()";
-
-                    cs.Append("                byte[] apiResponse = ApiUtilities.HttpPostFile(Api.ApiUri + \"/").Append(cat.Value.UriPath.ToLower()).Append("/").Append(func.Name.ToLower()).Append("\", ").Append(filesLineToAppend).AppendLine(", values);");
+                    if (netstandardCompatible)
+                    {
+                        cs.AppendLine("                byte[] apiResponse = await ApiUtilities.HttpPostFileAsync(\"/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "\", " + filesLineToAppend + ", values);");
+                    }
+                    else
+                    {
+                        cs.AppendLine("                byte[] apiResponse = ApiUtilities.HttpPostFile(Api.ApiUri + \"/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "\", " + filesLineToAppend + ", values);");
+                    }
                 }
                 else if (func.Parameters.Any(f => f.IsFilePutUpload == true))
-                    cs.Append("                byte[] apiResponse = ApiUtilities.HttpPutFile(Api.ApiUri + \"/").Append(cat.Value.UriPath.ToLower()).Append("/").Append(func.Name.ToLower()).Append("\", ").Append(func.Parameters.First(f => f.IsFilePutUpload).Name).AppendLine(", values);");
+                {
+                    if (netstandardCompatible)
+                    {
+                        cs.AppendLine("                byte[] apiResponse = await ApiUtilities.HttpPutFileAsync(\"/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "\", " + func.Parameters.First(f => f.IsFilePutUpload).Name + ", values);");
+                    }
+                    else
+                    {
+                        cs.AppendLine("                byte[] apiResponse = ApiUtilities.HttpPutFile(Api.ApiUri + \"/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "\", " + func.Parameters.First(f => f.IsFilePutUpload).Name + ", values);");
+                    }
+                }
                 else if (func.ReturnType.IsFile)
-                    cs.Append("                return ApiUtilities.HttpGetFile(Api.ApiUri + \"/").Append(cat.Value.UriPath.ToLower()).Append("/").Append(func.Name.ToLower()).AppendLine("\", values);");
+                {
+                    if (netstandardCompatible)
+                    {
+                        cs.AppendLine("                return await ApiUtilities.HttpGetFileAsync(\"/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "\", values);");
+                    }
+                    else
+                    {
+                        cs.AppendLine("                return ApiUtilities.HttpGetFile(Api.ApiUri + \"/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "\", values);");
+                    }
+                }
                 else
-                    cs.Append("                byte[] apiResponse = client.UploadValues(Api.ApiUri + \"/").Append(cat.Value.UriPath.ToLower()).Append("/").Append(func.Name.ToLower()).AppendLine("\", values);");
+                {
+                    if (netstandardCompatible)
+                    {
+                        uploadMethosIsPostAsync = true;
+                        cs.AppendLine("                ApiResponse<" + GetCSTypeName(func.ReturnType, "VoidApiResponse") + "> apiResponse = await ApiUtilities.PostAsync<" + GetCSTypeName(func.ReturnType, "VoidApiResponse") + ">(\"/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "\", values);");
+                    }
+                    else
+                    {
+                        cs.AppendLine("                byte[] apiResponse = client.UploadValues(Api.ApiUri + \"/" + cat.Value.UriPath.ToLower() + "/" + func.Name.ToLower() + "\", values);");
+                    }
+                }
 
                 return cs.ToString();
             }
